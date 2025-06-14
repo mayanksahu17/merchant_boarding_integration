@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Validate Application</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #000; }
+    label, input, button { display: block; margin-bottom: 10px; }
+    input { width: 100%; padding: 8px; }
+    button { padding: 10px 15px; font-size: 16px; }
+    pre { background: #ee3f3f; padding: 10px; white-space: pre-wrap; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <h1>Validate Application by External Key</h1>
+
+  <form id="validateForm">
+    <label for="externalKey">External Key</label>
+    <input type="text" id="externalKey" name="externalKey" required placeholder="Enter externalKey (e.g., 4656543265FGo)" />
+    <button type="submit">Validate Application</button>
+  </form>
+
+  <h2>Validation Result:</h2>
+  <pre id="response"></pre>
+
+  <script>
+    document.getElementById("validateForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const key = document.getElementById("externalKey").value.trim();
+
+      if (!key) return alert("Please enter a valid externalKey");
+
+      try {
+        const response = await fetch(`http://localhost:8000/api/application/validate/${encodeURIComponent(key)}`);
+        const result = await response.json();
+        document.getElementById("response").textContent = JSON.stringify(result, null, 2);
+      } catch (err) {
+        document.getElementById("response").textContent = `❌ Error: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

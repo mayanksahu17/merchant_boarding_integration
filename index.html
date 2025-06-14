@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Merchant Onboarding Test Form</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #000; color: #fff; }
+    label { display: block; margin: 10px 0 5px; }
+    input, select, textarea { width: 100%; padding: 8px; margin-bottom: 10px; }
+    button { padding: 10px 15px; font-size: 16px; margin-top: 5px; }
+    pre { background: #f0f0f0; padding: 10px; overflow-x: auto; color: black; }
+  </style>
+</head>
+<body>
+  <h1>Merchant Onboarding Form (Test)</h1>
+  <form id="onboardingForm">
+    <label for="applicationName">Application Name</label>
+    <input type="text" id="applicationName" value="Joe's spaceage Stereo - Vermont" required />
+
+    <label for="externalKey">External Key</label>
+    <div style="display: flex; gap: 10px;">
+      <input type="text" id="externalKey" readonly />
+      <button type="button" onclick="copyKey()">📋 Copy</button>
+    </div>
+
+    <label for="planId">Plan ID</label>
+    <input type="number" id="planId" value="819470" required />
+
+    <label for="abaRouting">ABA Routing Number</label>
+    <input type="text" id="abaRouting" value="021000021" required />
+
+    <button type="submit">Submit Application</button>
+  </form>
+
+  <h2>Response:</h2>
+  <pre id="response"></pre>
+
+  <script>
+    // Generate random external key on load
+    const generateRandomKey = () => "EXT" + Math.floor(Math.random() * 1e14);
+    const externalKeyInput = document.getElementById("externalKey");
+    externalKeyInput.value = generateRandomKey();
+
+    // Copy external key
+    function copyKey() {
+      navigator.clipboard.writeText(externalKeyInput.value);
+      alert("External key copied!");
+    }
+
+    // Handle form submission
+    document.getElementById("onboardingForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      
+  const payload = {
+  agent: 84152,
+  applicationName: document.getElementById("applicationName").value,
+  externalKey: externalKeyInput.value,
+  plan: {
+    planId: parseInt(document.getElementById("planId").value),
+    equipmentCostToMerchant: 325.49,
+    accountSetupFee: 12.95,
+    discountFrequency: "Daily",
+    equipment: [
+      {
+        equipmentId: 1155,
+        quantity: 1
+      }
+    ]
+  },
+  shipping: {
+    shippingDestination: "DBA",
+    deliveryMethod: "Ground"
+  },
+  principals: [
+    {
+      firstName: "Jane",
+      lastName: "Jackson",
+      socialSecurityNumber: "745392845",
+      dateOfBirth: "1955-12-25",
+      phoneNumber: "1234567890",
+      email: "example@email.com",
+      street: "123 Selah Way",
+      street2: "Suite 123",
+      zipCode: "12345",
+      city: "South Burlington",
+      state: "VT",
+      equityOwnershipPercentage: 80,
+      title: "ceo",
+      isPersonalGuarantor: true,
+      driverLicenseNumber: "ABC1234567890",
+      driverLicenseIssuedState: "MI"
+    },
+    {
+      firstName: "Jeremy",
+      lastName: "Coelman",
+      socialSecurityNumber: "678901234",
+      dateOfBirth: "1955-12-25",
+      phoneNumber: "1234567890",
+      email: "example@email.com",
+      street: "1234 Finwood Drive",
+      zipCode: "12345",
+      city: "Red Bank",
+      state: "NJ",
+      equityOwnershipPercentage: 20,
+      title: "manager",
+      isPersonalGuarantor: false,
+      driverLicenseNumber: null,
+      driverLicenseIssuedState: null
+    }
+  ],
+  business: {
+    corporateName: "Joe's Spaceage Stereo",
+    dbaName: "Jo Jackson Spaceage Stereo",
+    businessType: "C",
+    federalTaxIdNumber: "123456789",
+    federalTaxIdType: "EIN",
+    mcc: "5812",
+    phone: "1234567890",
+    email: "example@email.com",
+    ebt: null,
+    websites: [
+      {
+        url: "https://example.com",
+        websiteCustomerServiceEmail: "customer-service-email@example.com",
+        websiteCustomerServicePhoneNumber: "1234567890"
+      }
+    ],
+    averageTicketAmount: 5000,
+    averageMonthlyVolume: 1250000,
+    highTicketAmount: 125000,
+    merchandiseServicesSold: "Audio components and services",
+    percentOfBusinessTransactions: {
+      cardSwiped: 65,
+      keyedCardPresentNotImprinted: 20,
+      mailOrPhoneOrder: 0,
+      internet: 15
+    },
+    businessContact: {
+      firstName: "Roy",
+      lastName: "Martin",
+      socialSecurityNumber: "987654321",
+      dateOfBirth: "1947-11-05",
+      street: "123 Late Avenue",
+      street2: "",
+      zipCode: "12345",
+      city: "South Burington",
+      state: "VT",
+      phoneNumber: "1234567890",
+      email: "example@email.com"
+    },
+    statementDeliveryMethod: "electronic",
+    businessAddress: {
+      dba: {
+        street: "1234 Clinton St",
+        city: "South Burlington",
+        state: "VT",
+        zipCode: "12345"
+      },
+      corporate: {
+        street: "1234 Sun Valley Rd",
+        city: "South Burlington",
+        state: "VT",
+        zipCode: "12345"
+      },
+      shipTo: {
+        street: "1234 Saint James Drive",
+        city: "South Burlington",
+        state: "VT",
+        zipCode: "12345"
+      }
+    },
+    businessServicesRequested: [
+      {
+        ebt: [
+          {
+            ebtType: "food",
+            ebtAccountNumber: "987654321"
+          }
+        ]
+      }
+    ]
+  },
+  bankAccount: {
+    abaRouting: document.getElementById("abaRouting").value,
+    accountType: "checking",
+    demandDepositAccount: "123456789"
+  }
+};
+
+      const res = await fetch("http://localhost:8000/api/application", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      document.getElementById("response").textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>

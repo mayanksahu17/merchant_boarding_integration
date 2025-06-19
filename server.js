@@ -6,6 +6,7 @@ const fs = require("fs");
 const app = express();
 const cors = require("cors");
 const path = require("path");
+const sgMail = require('@sendgrid/mail');
 
 app.use(express.json());
 app.use(cors());
@@ -14,6 +15,9 @@ app.use(cors());
 app.use(express.static(path.join(__dirname)));
 
 const TOKEN_FILE = "./token.json";
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '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';
+sgMail.setApiKey(SENDGRID_API_KEY);
+
 async function getAccessToken() {
   try {
     const response = await axios.post(
@@ -253,6 +257,78 @@ app.post('/api/merchant/full-update', async (req, res) => {
 // Serve merchant portal
 app.get("/merchant-portal", (req, res) => {
   res.sendFile(path.join(__dirname, 'merchant.html'));
+});
+
+// Send merchant form link email
+app.post('/api/send-merchant-link', async (req, res) => {
+  const { email, externalKey } = req.body;
+  if (!email || !externalKey) {
+    return res.status(400).json({ error: 'email and externalKey are required' });
+  }
+  try {
+    // Construct merchant form link (assuming server is same as frontend origin)
+    const baseUrl = req.headers.origin || `http://localhost:${PORT}`;
+    const merchantUrl = `${baseUrl}/merchant-form.html?key=${encodeURIComponent(externalKey)}`;
+    const msg = {
+      to: email,
+      from: 'development@zifypay.com',
+      subject: 'Your Merchant Application Link',
+      html: `
+        <h2>Merchant Application Link</h2>
+        <p>You have been invited to complete your merchant application.</p>
+        <p><strong>Application ID:</strong> ${externalKey}</p>
+        <p>Click the link below to access your application form:</p>
+        <p style="margin: 20px 0;">
+          <a href="${merchantUrl}" style="background: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+            📝 Complete Application
+          </a>
+        </p>
+        <p>Or copy and paste this link into your browser:</p>
+        <p style="background: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all;">
+          ${merchantUrl}
+        </p>
+        <p>This link will allow you to fill out your merchant application details.</p>
+        <p>If you have any questions, please contact our support team.</p>
+        <p>Best regards,<br>Merchant Onboarding Team</p>
+      `
+    };
+    await sgMail.send(msg);
+    res.json({ success: true, message: 'Merchant link email sent successfully.' });
+  } catch (error) {
+    console.error('SendGrid error:', error.response?.body || error.message);
+    res.status(500).json({ error: error.message, details: error.response?.body });
+  }
+});
+
+// Send application submission confirmation email
+app.post('/api/send-submission-confirmation', async (req, res) => {
+  const { email, applicationName, externalKey } = req.body;
+  if (!email || !applicationName || !externalKey) {
+    return res.status(400).json({ error: 'email, applicationName, and externalKey are required' });
+  }
+  try {
+    const msg = {
+      to: email,
+      from: 'noreply@merchantonboarding.com',
+      subject: 'Application Submitted to Underwriting',
+      html: `
+        <h2>Application Submitted Successfully!</h2>
+        <p>Your merchant application has been submitted to underwriting for review.</p>
+        <p><strong>Application Name:</strong> ${applicationName}</p>
+        <p><strong>Application ID:</strong> ${externalKey}</p>
+        <p><strong>Submission Date:</strong> ${new Date().toLocaleDateString()}</p>
+        <p>Our underwriting team will review your application and contact you within 2-3 business days.</p>
+        <p>You will receive updates on your application status via email.</p>
+        <p>Thank you for choosing our merchant services!</p>
+        <p>Best regards,<br>Merchant Onboarding Team</p>
+      `
+    };
+    await sgMail.send(msg);
+    res.json({ success: true, message: 'Submission confirmation email sent successfully.' });
+  } catch (error) {
+    console.error('SendGrid error:', error.response?.body || error.message);
+    res.status(500).json({ error: error.message, details: error.response?.body });
+  }
 });
 
 // Run Server

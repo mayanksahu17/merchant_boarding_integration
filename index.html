@@ -622,10 +622,6 @@
     // Store applications in localStorage
     let applications = JSON.parse(localStorage.getItem('applications') || '[]');
 
-    // Email configuration
-    const SENDGRID_API_KEY = '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';
-    let selectedEmailTemplate = 'welcome';
-
     // Application status constants
     const APPLICATION_STATUSES = {
       PENDING: 'pending',
@@ -729,70 +725,52 @@
     };
 
     // Send email function
-    async function sendEmail() {
-      const emailAddress = document.getElementById('emailAddress').value.trim();
-      const applicationName = document.getElementById('applicationName').value.trim();
-      const externalKey = document.getElementById('externalKey').value.trim();
+    // async function sendEmail() {
+    //   const emailAddress = document.getElementById('emailAddress').value.trim();
+    //   const applicationName = document.getElementById('applicationName').value.trim();
+    //   const externalKey = document.getElementById('externalKey').value.trim();
       
-      if (!emailAddress) {
-        showStatus('Please enter an email address', 'error');
-        return;
-      }
+    //   if (!emailAddress) {
+    //     showStatus('Please enter an email address', 'error');
+    //     return;
+    //   }
       
-      if (!applicationName || !externalKey) {
-        showStatus('Please create an application first', 'error');
-        return;
-      }
+    //   if (!applicationName || !externalKey) {
+    //     showStatus('Please create an application first', 'error');
+    //     return;
+    //   }
 
-      const sendButton = event.target;
-      setButtonLoading(sendButton, true);
-      showLoading('Sending email...');
+    //   const sendButton = event.target;
+    //   setButtonLoading(sendButton, true);
+    //   showLoading('Sending email...');
 
-      try {
-        const template = emailTemplates[selectedEmailTemplate];
-        const status = applications.find(app => app.externalKey === externalKey)?.status || 'pending';
+    //   try {
+    //     const template = emailTemplates[selectedEmailTemplate];
+    //     const status = applications.find(app => app.externalKey === externalKey)?.status || 'pending';
         
-        const emailData = {
-          to: emailAddress,
-          from: 'noreply@merchantonboarding.com',
-          subject: template.subject,
-          html: template.content(applicationName, externalKey, status)
-        };
-
-        // Send email using SendGrid API
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            personalizations: [{
-              to: [{ email: emailData.to }]
-            }],
-            from: { email: emailData.from },
-            subject: emailData.subject,
-            content: [{
-              type: 'text/html',
-              value: emailData.html
-            }]
-          })
-        });
-
-        if (response.ok) {
-          showStatus('Email sent successfully!', 'success');
-        } else {
-          const errorData = await response.json();
-          throw new Error(`SendGrid Error: ${errorData.errors?.[0]?.message || 'Unknown error'}`);
-        }
-      } catch (error) {
-        console.error('Email sending error:', error);
-        showStatus(`Failed to send email: ${error.message}`, 'error');
-      } finally {
-        setButtonLoading(sendButton, false);
-        hideLoading();
-      }
-    }
+    //     // Send email using backend API (implement this endpoint if needed)
+    //     // Example:
+    //     // const response = await fetch('/api/send-email', {
+    //     //   method: 'POST',
+    //     //   headers: { 'Content-Type': 'application/json' },
+    //     //   body: JSON.stringify({
+    //     //     to: emailAddress,
+    //     //     subject: template.subject,
+    //     //     html: template.content(applicationName, externalKey, status)
+    //     //   })
+    //     // });
+    //     // if (response.ok) { ... }
+    //     // else { ... }
+    //     // For now, just show a message:
+    //     showStatus('Email sending via backend is not implemented yet.', 'info');
+    //   } catch (error) {
+    //     console.error('Email sending error:', error);
+    //     showStatus(`Failed to send email: ${error.message}`, 'error');
+    //   } finally {
+    //     setButtonLoading(sendButton, false);
+    //     hideLoading();
+    //   }
+    // }
 
     // Send merchant link via email
     async function sendMerchantLinkEmail() {
@@ -814,89 +792,21 @@
       showLoading('Sending merchant link...');
 
       try {
-        const baseUrl = window.location.origin;
-        const merchantUrl = `${baseUrl}/merchant-form.html?key=${encodeURIComponent(externalKey)}`;
-        
-        const emailData = {
-          to: emailAddress,
-          from: 'noreply@merchantonboarding.com',
-          subject: 'Your Merchant Application Link',
-          html: `
-            <h2>Merchant Application Link</h2>
-            <p>You have been invited to complete your merchant application.</p>
-            <p><strong>Application ID:</strong> ${externalKey}</p>
-            <p>Click the link below to access your application form:</p>
-            <p style="margin: 20px 0;">
-              <a href="${merchantUrl}" style="background: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                📝 Complete Application
-              </a>
-            </p>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="background: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all;">
-              ${merchantUrl}
-            </p>
-            <p>This link will allow you to fill out your merchant application details.</p>
-            <p>If you have any questions, please contact our support team.</p>
-            <p>Best regards,<br>Merchant Onboarding Team</p>
-          `
-        };
-
-        // Send email using SendGrid API
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        // Call backend API to send email
+        const response = await fetch('http://localhost:8000/api/send-merchant-link', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${SENDGRID_API_KEY}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            personalizations: [{
-              to: [{ email: emailData.to }]
-            }],
-            from: { email: emailData.from },
-            subject: emailData.subject,
-            content: [{
-              type: 'text/html',
-              value: emailData.html
-            }]
-          })
+          body: JSON.stringify({ email: emailAddress, externalKey })
         });
 
         if (response.ok) {
-          // Update email tracking
-          const appIndex = applications.findIndex(app => app.externalKey === externalKey);
-          if (appIndex !== -1) {
-            applications[appIndex].emailsSent[EMAIL_TYPES.MERCHANT_LINK] = true;
-            applications[appIndex].emailHistory.push({
-              type: EMAIL_TYPES.MERCHANT_LINK,
-              sentAt: new Date().toISOString(),
-              recipient: emailAddress,
-              success: true
-            });
-            applications[appIndex].updatedAt = new Date().toISOString();
-            localStorage.setItem('applications', JSON.stringify(applications));
-            
-            // Re-render applications to show updated email history
-            renderApplications();
-          }
-          
           showStatus('Merchant link sent successfully!', 'success');
           document.getElementById('linkEmailAddress').value = '';
         } else {
-          // Track failed email
-          const appIndex = applications.findIndex(app => app.externalKey === externalKey);
-          if (appIndex !== -1) {
-            applications[appIndex].emailHistory.push({
-              type: EMAIL_TYPES.MERCHANT_LINK,
-              sentAt: new Date().toISOString(),
-              recipient: emailAddress,
-              success: false,
-              error: errorData.errors?.[0]?.message || 'Unknown error'
-            });
-            localStorage.setItem('applications', JSON.stringify(applications));
-          }
-          
           const errorData = await response.json();
-          throw new Error(`SendGrid Error: ${errorData.errors?.[0]?.message || 'Unknown error'}`);
+          throw new Error(errorData.error || 'Unknown error');
         }
       } catch (error) {
         console.error('Email sending error:', error);
@@ -932,63 +842,21 @@
           applications[index].status = APPLICATION_STATUSES.SUBMITTED;
           applications[index].updatedAt = new Date().toISOString();
           applications[index].submittedAt = new Date().toISOString();
-          
+
           // Send submission confirmation email if email is available
           if (applications[index].email) {
             try {
-              const confirmationEmailData = {
-                to: applications[index].email,
-                from: 'noreply@merchantonboarding.com',
-                subject: 'Application Submitted to Underwriting',
-                html: `
-                  <h2>Application Submitted Successfully!</h2>
-                  <p>Your merchant application has been submitted to underwriting for review.</p>
-                  <p><strong>Application Name:</strong> ${applications[index].applicationName}</p>
-                  <p><strong>Application ID:</strong> ${applications[index].externalKey}</p>
-                  <p><strong>Submission Date:</strong> ${new Date().toLocaleDateString()}</p>
-                  <p>Our underwriting team will review your application and contact you within 2-3 business days.</p>
-                  <p>You will receive updates on your application status via email.</p>
-                  <p>Thank you for choosing our merchant services!</p>
-                  <p>Best regards,<br>Merchant Onboarding Team</p>
-                `
-              };
-
-              const emailResponse = await fetch('https://api.sendgrid.com/v3/mail/send', {
+              await fetch('http://localhost:8000/api/send-submission-confirmation', {
                 method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-                  'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  personalizations: [{
-                    to: [{ email: confirmationEmailData.to }]
-                  }],
-                  from: { email: confirmationEmailData.from },
-                  subject: confirmationEmailData.subject,
-                  content: [{
-                    type: 'text/html',
-                    value: confirmationEmailData.html
-                  }]
+                  email: applications[index].email,
+                  applicationName: applications[index].applicationName,
+                  externalKey: applications[index].externalKey
                 })
-              });
-
-              // Track email sending
-              applications[index].emailsSent[EMAIL_TYPES.SUBMISSION_CONFIRMATION] = emailResponse.ok;
-              applications[index].emailHistory.push({
-                type: EMAIL_TYPES.SUBMISSION_CONFIRMATION,
-                sentAt: new Date().toISOString(),
-                recipient: applications[index].email,
-                success: emailResponse.ok
               });
             } catch (emailError) {
               console.error('Failed to send submission confirmation email:', emailError);
-              applications[index].emailHistory.push({
-                type: EMAIL_TYPES.SUBMISSION_CONFIRMATION,
-                sentAt: new Date().toISOString(),
-                recipient: applications[index].email,
-                success: false,
-                error: emailError.message
-              });
             }
           }
           
@@ -1503,23 +1371,10 @@
                 `
               };
 
-              const emailResponse = await fetch('https://api.sendgrid.com/v3/mail/send', {
+              const emailResponse = await fetch('/api/send-email', {
                 method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  personalizations: [{
-                    to: [{ email: statusEmailData.to }]
-                  }],
-                  from: { email: statusEmailData.from },
-                  subject: statusEmailData.subject,
-                  content: [{
-                    type: 'text/html',
-                    value: statusEmailData.html
-                  }]
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(statusEmailData)
               });
 
               // Track status update email

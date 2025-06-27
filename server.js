@@ -53,7 +53,7 @@ async function getAccessToken() {
 
 
 // Cron Job to refresh token every 2 minutes
-setInterval(() => {
+setInterval(() => { 
   console.log("🔄 Refreshing access token...");
   getAccessToken();
 }, 2 * 60 * 1000); // 2 minutes

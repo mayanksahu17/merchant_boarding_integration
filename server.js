@@ -20,24 +20,24 @@ sgMail.setApiKey(SENDGRID_API_KEY);
 
 async function getAccessToken() {
   try {
+    const params = new URLSearchParams();
+    params.append("grant_type", "client_credentials");
+    params.append("scope", "all");
+    params.append("client_id", "1676b042eebd375ac46adb7d9f86a533");
+    params.append("client_secret", "RGzHc8udH2q*RzfGmXP#36SNfVEF7U@E");
+
     const response = await axios.post(
       "https://enrollment-api-auth.paymentshub.com/oauth/token",
-      {
-        grant_type: "client_credentials",
-        scope: "all",
-        client_id: "1676b042eebd375ac46adb7d9f86a533",
-        client_secret: "RGzHc8udH2q*RzfGmXP#36SNfVEF7U@E"
-      },
+      params,
       {
         headers: {
-          "Content-Type": "application/json", // ✅ Raw JSON, not URL-encoded
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       }
     );
 
     const accessToken = response.data.access_token;
 
-    // Write token to file
     fs.writeFileSync(
       TOKEN_FILE,
       JSON.stringify({ token: accessToken, time: new Date() }, null, 2)
@@ -75,6 +75,11 @@ app.use((req, res, next) => {
 app.use((req, res, next) => {
   console.log(`🌐 ${req.method} ${req.path} - ${new Date().toISOString()}`);
   next();
+});
+
+// Serve index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Test endpoint
@@ -253,6 +258,7 @@ app.post('/api/merchant/full-update', async (req, res) => {
     }
   }
 });
+
 
 // Serve merchant portal
 app.get("/merchant-portal", (req, res) => {

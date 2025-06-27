@@ -8,7 +8,7 @@ git pull origin main
 
 npm i 
 
-pm2 restart merchant_boarding_integration
+pm2 restart  merchant-api 
 
 pm2 save 
 

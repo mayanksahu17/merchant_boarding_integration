@@ -1057,7 +1057,7 @@
         showLoading('Loading application data...');
         console.log('Fetching data for external key:', externalKey);
         
-        const response = await fetch(`http://3.86.26.146:8000/api/application/${externalKey}`);
+        const response = await fetch(`https://merchant.zifypay.com/api/application/${externalKey}`);
         console.log('API Response status:', response.status);
         
         const data = await response.json();
@@ -1887,7 +1887,7 @@
 
       try {
         // Submit the application
-        const submitResponse = await fetch('http://3.86.26.146:8000/api/merchant/full-update', {
+        const submitResponse = await fetch('https://merchant.zifypay.com/api/merchant/full-update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -1910,7 +1910,7 @@
         showLoading('Validating application...');
         
         const externalKey = document.getElementById('externalKey').value;
-        const validationResponse = await fetch(`http://3.86.26.146:8000/api/application/validate/${encodeURIComponent(externalKey)}`);
+        const validationResponse = await fetch(`https://merchant.zifypay.com/api/application/validate/${encodeURIComponent(externalKey)}`);
         const validationData = await validationResponse.json();
         console.log('Validation response:', validationData);
         

@@ -5,7 +5,6 @@ import ProgressBar from '@/app/components/ProgressBar';
 import FormSection from '@/app/components/FormSection';
 import ThankYouMessage from '@/app/components/ThankYouMessage';
 import LoadingOverlay from '@/app/components/LoadingOverlay';
-import PrincipalForm from '../components/PrincipalForm';
 import { API_URL } from '../utils/constants';
 
 type Principal = {
@@ -262,11 +261,6 @@ export default function MerchantApplication() {
 
       if (response.ok && data) {
         populateFormWithData(data);
-        setStatusMessage({
-          type: 'success',
-          title: 'Application Data Loaded',
-          description: 'The application data has been successfully loaded and populated into the form.',
-        });
       } else {
         setStatusMessage({
           type: 'warning',
@@ -287,99 +281,101 @@ export default function MerchantApplication() {
   };
 
   const populateFormWithData = (data: any) => {
-    const applicationData = data.data ? data.data.application : data;
+    const applicationData = data.data?.application;
     if (!applicationData) return;
 
     setFormData(prev => ({
       ...prev,
       agent: applicationData.agent || prev.agent,
-      applicationName: applicationData.applicationName || prev.applicationName,
-      externalKey: applicationData.externalKey || prev.externalKey,
+      applicationName: applicationData.applicationName || '',
+      externalKey: applicationData.externalKey || '',
       plan: {
-        ...prev.plan,
-        planId: applicationData.plan?.planId || prev.plan?.planId,
-        equipmentCostToMerchant: applicationData.plan?.equipmentCostToMerchant || prev.plan?.equipmentCostToMerchant,
-        accountSetupFee: applicationData.plan?.accountSetupFee || prev.plan?.accountSetupFee,
-        discountFrequency: applicationData.plan?.discountFrequency || prev.plan?.discountFrequency,
-        equipment: applicationData.plan?.equipment?.length > 0
-          ? applicationData.plan.equipment
-          : prev.plan?.equipment || [],
+        planId: applicationData.plan?.planId || 0,
+        equipmentCostToMerchant: applicationData.plan?.equipmentCostToMerchant || 0,
+        accountSetupFee: applicationData.plan?.accountSetupFee || 0,
+        discountFrequency: applicationData.plan?.discountFrequency || '',
+        equipment: applicationData.plan?.equipment || [{
+          equipmentId: 0,
+          quantity: 0
+        }]
       },
       shipping: {
-        shippingDestination: applicationData.shipping?.shippingDestination || prev.shipping?.shippingDestination,
-        deliveryMethod: applicationData.shipping?.deliveryMethod || prev.shipping?.deliveryMethod,
+        shippingDestination: applicationData.shipping?.shippingDestination || '',
+        deliveryMethod: applicationData.shipping?.deliveryMethod || '',
       },
-      principals: applicationData.principals?.length > 0
-        ? applicationData.principals
-        : prev.principals || [],
+      principals: applicationData.principals || [],
       business: {
-        ...prev.business,
-        corporateName: applicationData.business?.corporateName || prev.business?.corporateName,
-        dbaName: applicationData.business?.dbaName || prev.business?.dbaName,
-        businessType: applicationData.business?.businessType || prev.business?.businessType,
-        federalTaxIdNumber: applicationData.business?.federalTaxIdNumber || prev.business?.federalTaxIdNumber,
-        federalTaxIdType: applicationData.business?.federalTaxIdType || prev.business?.federalTaxIdType,
-        mcc: applicationData.business?.mcc || prev.business?.mcc,
-        phone: applicationData.business?.phone || prev.business?.phone,
-        email: applicationData.business?.email || prev.business?.email,
-        averageTicketAmount: applicationData.business?.averageTicketAmount || prev.business?.averageTicketAmount,
-        averageMonthlyVolume: applicationData.business?.averageMonthlyVolume || prev.business?.averageMonthlyVolume,
-        highTicketAmount: applicationData.business?.highTicketAmount || prev.business?.highTicketAmount,
-        merchandiseServicesSold: applicationData.business?.merchandiseServicesSold || prev.business?.merchandiseServicesSold,
-        percentOfBusinessTransactions: {
-          cardSwiped: applicationData.business?.percentOfBusinessTransactions?.cardSwiped || 0,
-          keyedCardPresentNotImprinted: applicationData.business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted || 0,
-          mailOrPhoneOrder: applicationData.business?.percentOfBusinessTransactions?.mailOrPhoneOrder || 0,
-          internet: applicationData.business?.percentOfBusinessTransactions?.internet || 0,
+        corporateName: applicationData.business?.corporateName || '',
+        dbaName: applicationData.business?.dbaName || '',
+        businessType: applicationData.business?.businessType || '',
+        federalTaxIdNumber: applicationData.business?.federalTaxIdNumber || '',
+        federalTaxIdType: applicationData.business?.federalTaxIdType || '',
+        mcc: applicationData.business?.mcc || '',
+        phone: applicationData.business?.phone || '',
+        email: applicationData.business?.email || '',
+        averageTicketAmount: applicationData.business?.averageTicketAmount || 0,
+        averageMonthlyVolume: applicationData.business?.averageMonthlyVolume || 0,
+        highTicketAmount: applicationData.business?.highTicketAmount || 0,
+        merchandiseServicesSold: applicationData.business?.merchandiseServicesSold || '',
+        percentOfBusinessTransactions: applicationData.business?.percentOfBusinessTransactions || {
+          cardSwiped: 0,
+          keyedCardPresentNotImprinted: 0,
+          mailOrPhoneOrder: 0,
+          internet: 0,
         },
-        businessContact: {
-          firstName: applicationData.business?.businessContact?.firstName || '',
-          lastName: applicationData.business?.businessContact?.lastName || '',
-          socialSecurityNumber: applicationData.business?.businessContact?.socialSecurityNumber || '',
-          dateOfBirth: applicationData.business?.businessContact?.dateOfBirth || '',
-          street: applicationData.business?.businessContact?.street || '',
-          street2: applicationData.business?.businessContact?.street2 || '',
-          zipCode: applicationData.business?.businessContact?.zipCode || '',
-          city: applicationData.business?.businessContact?.city || '',
-          state: applicationData.business?.businessContact?.state || '',
-          phoneNumber: applicationData.business?.businessContact?.phoneNumber || '',
-          email: applicationData.business?.businessContact?.email || '',
+        businessContact: applicationData.business?.businessContact || {
+          firstName: '',
+          lastName: '',
+          socialSecurityNumber: '',
+          dateOfBirth: '',
+          street: '',
+          street2: '',
+          zipCode: '',
+          city: '',
+          state: '',
+          phoneNumber: '',
+          email: '',
         },
-        statementDeliveryMethod: applicationData.business?.statementDeliveryMethod || prev.business?.statementDeliveryMethod,
-        businessAddress: {
+        statementDeliveryMethod: applicationData.business?.statementDeliveryMethod || 'electronic',
+        businessAddress: applicationData.business?.businessAddress || {
           dba: {
-            street: applicationData.business?.businessAddress?.dba?.street || '',
-            street2: applicationData.business?.businessAddress?.dba?.street2 || '',
-            city: applicationData.business?.businessAddress?.dba?.city || '',
-            state: applicationData.business?.businessAddress?.dba?.state || '',
-            zipCode: applicationData.business?.businessAddress?.dba?.zipCode || '',
+            street: '',
+            street2: '',
+            city: '',
+            state: '',
+            zipCode: '',
           },
           corporate: {
-            street: applicationData.business?.businessAddress?.corporate?.street || '',
-            street2: applicationData.business?.businessAddress?.corporate?.street2 || '',
-            city: applicationData.business?.businessAddress?.corporate?.city || '',
-            state: applicationData.business?.businessAddress?.corporate?.state || '',
-            zipCode: applicationData.business?.businessAddress?.corporate?.zipCode || '',
+            street: '',
+            street2: '',
+            city: '',
+            state: '',
+            zipCode: '',
           },
           shipTo: {
-            street: applicationData.business?.businessAddress?.shipTo?.street || '',
-            street2: applicationData.business?.businessAddress?.shipTo?.street2 || '',
-            city: applicationData.business?.businessAddress?.shipTo?.city || '',
-            state: applicationData.business?.businessAddress?.shipTo?.state || '',
-            zipCode: applicationData.business?.businessAddress?.shipTo?.zipCode || '',
-          },
+            street: '',
+            street2: '',
+            city: '',
+            state: '',
+            zipCode: '',
+          }
         },
-        websites: applicationData.business?.websites?.length > 0
-          ? applicationData.business.websites
-          : prev.business?.websites || [],
-        businessServicesRequested: applicationData.business?.businessServicesRequested || prev.business?.businessServicesRequested || [],
+        websites: applicationData.business?.websites || [],
+        businessServicesRequested: applicationData.business?.businessServicesRequested || [],
       },
-      bankAccount: {
-        abaRouting: applicationData.bankAccount?.abaRouting || prev.bankAccount?.abaRouting,
-        accountType: applicationData.bankAccount?.accountType || prev.bankAccount?.accountType,
-        demandDepositAccount: applicationData.bankAccount?.demandDepositAccount || prev.bankAccount?.demandDepositAccount,
+      bankAccount: applicationData.bankAccount || {
+        accountType: 'checking',
+        abaRouting: '',
+        demandDepositAccount: '',
       },
     }));
+
+    // Show success message
+    setStatusMessage({
+      type: 'success',
+      title: 'Application Data Loaded',
+      description: 'The application data has been successfully loaded and populated into the form.',
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -524,7 +520,7 @@ export default function MerchantApplication() {
   return (
     <div className="container">
       <div className="header">
-        <h1>Merchant Application Form</h1>
+        <h1>Merchant Full Application Form</h1>
         <p>Complete merchant and business details for processing</p>
       </div>
 
@@ -541,15 +537,14 @@ export default function MerchantApplication() {
             >
               <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="agent">Agent ID <span className="required">*</span></label>
+                  <label htmlFor="agent">Agent <span className="required">*</span></label>
                   <input
                     type="number"
                     id="agent"
                     name="agent"
                     value={formData.agent || ''}
-                    onChange={handleInputChange}
-                    required
                     readOnly
+                    required
                   />
                 </div>
 
@@ -572,100 +567,106 @@ export default function MerchantApplication() {
                     id="externalKey"
                     name="externalKey"
                     value={formData.externalKey || ''}
-                    onChange={handleInputChange}
+                    readOnly
                     required
                   />
                 </div>
               </div>
 
-              <h3>Plan Information</h3>
               <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="plan.planId">Plan ID <span className="required">*</span></label>
+                  <label htmlFor="planId">Plan ID <span className="required">*</span></label>
                   <input
                     type="number"
-                    id="plan.planId"
+                    id="planId"
                     name="plan.planId"
                     value={formData.plan?.planId || ''}
                     onChange={handleInputChange}
                     required
-                    readOnly
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="plan.equipmentCostToMerchant">Equipment Cost <span className="required">*</span></label>
+                  <label htmlFor="equipmentCostToMerchant">Equipment Cost</label>
                   <input
                     type="number"
-                    step="0.01"
-                    id="plan.equipmentCostToMerchant"
+                    id="equipmentCostToMerchant"
                     name="plan.equipmentCostToMerchant"
                     value={formData.plan?.equipmentCostToMerchant || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="plan.accountSetupFee">Account Setup Fee <span className="required">*</span></label>
+                  <label htmlFor="accountSetupFee">Setup Fee</label>
                   <input
                     type="number"
-                    step="0.01"
-                    id="plan.accountSetupFee"
+                    id="accountSetupFee"
                     name="plan.accountSetupFee"
                     value={formData.plan?.accountSetupFee || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="plan.discountFrequency">Discount Frequency <span className="required">*</span></label>
-                  <select
-                    id="plan.discountFrequency"
+                  <label htmlFor="discountFrequency">Discount Frequency</label>
+                  <input
+                    type="text"
+                    id="discountFrequency"
                     name="plan.discountFrequency"
                     value={formData.plan?.discountFrequency || ''}
                     onChange={handleInputChange}
-                    required
-                  >
-                    <option className='bg-slate-900' value="">Select Frequency</option>
-                    <option className='bg-slate-900' value="Daily">Daily</option>
-                    <option className='bg-slate-900' value="Weekly">Weekly</option>
-                    <option className='bg-slate-900' value="Monthly">Monthly</option>
-                  </select>
+                  />
                 </div>
               </div>
 
-              <h3>Shipping Information</h3>
+              <div className="array-section">
+                <div className="array-section-title">Equipment</div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="equipmentId">Equipment ID</label>
+                    <input
+                      type="number"
+                      id="equipmentId"
+                      name="plan.equipment[0].equipmentId"
+                      value={formData.plan?.equipment?.[0]?.equipmentId || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="equipmentQuantity">Quantity</label>
+                    <input
+                      type="number"
+                      id="equipmentQuantity"
+                      name="plan.equipment[0].quantity"
+                      value={formData.plan?.equipment?.[0]?.quantity || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="shipping.shippingDestination">Shipping Destination <span className="required">*</span></label>
-                  <select
-                    id="shipping.shippingDestination"
+                  <label htmlFor="shippingDestination">Shipping Destination</label>
+                  <input
+                    type="text"
+                    id="shippingDestination"
                     name="shipping.shippingDestination"
                     value={formData.shipping?.shippingDestination || ''}
                     onChange={handleInputChange}
-                    required
-                  >
-                    <option className='bg-slate-900' value="">Select Destination</option>
-                    <option className='bg-slate-900' value="DBA">DBA Address</option>
-                    <option className='bg-slate-900' value="Corporate">Corporate Address</option>
-                    <option className='bg-slate-900' value="Other">Other Address</option>
-                  </select>
+                  />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="shipping.deliveryMethod">Delivery Method <span className="required">*</span></label>
-                  <select
-                    id="shipping.deliveryMethod"
+                  <label htmlFor="deliveryMethod">Delivery Method</label>
+                  <input
+                    type="text"
+                    id="deliveryMethod"
                     name="shipping.deliveryMethod"
                     value={formData.shipping?.deliveryMethod || ''}
                     onChange={handleInputChange}
-                    required
-                  >
-                    <option className='bg-slate-900' value="">Select Method</option>
-                    <option className='bg-slate-900' value="Ground">Ground</option>
-                  </select>
+                  />
                 </div>
               </div>
             </FormSection>
@@ -676,529 +677,301 @@ export default function MerchantApplication() {
               id="step2"
               title="Business Information"
             >
-              <h3>Basic Business Details</h3>
               <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="business.corporateName">Corporate Name <span className="required">*</span></label>
+                  <label htmlFor="corporateName">Corporate Name</label>
                   <input
                     type="text"
-                    id="business.corporateName"
+                    id="corporateName"
                     name="business.corporateName"
                     value={formData.business?.corporateName || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.dbaName">DBA Name <span className="required">*</span></label>
+                  <label htmlFor="dbaName">DBA Name</label>
                   <input
                     type="text"
-                    id="business.dbaName"
+                    id="dbaName"
                     name="business.dbaName"
                     value={formData.business?.dbaName || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.businessType">Business Type <span className="required">*</span></label>
+                  <label htmlFor="businessType">Business Type</label>
                   <input
                     type="text"
-                    id="business.businessType"
+                    id="businessType"
                     name="business.businessType"
                     value={formData.business?.businessType || ''}
                     onChange={handleInputChange}
-                    required
                   />  
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.federalTaxIdNumber">Federal Tax ID <span className="required">*</span></label>
+                  <label htmlFor="federalTaxIdNumber">Federal Tax ID</label>
                   <input
                     type="text"
-                    id="business.federalTaxIdNumber"
+                    id="federalTaxIdNumber"
                     name="business.federalTaxIdNumber"
                     value={formData.business?.federalTaxIdNumber || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.federalTaxIdType">Tax ID Type <span className="required">*</span></label>
+                  <label htmlFor="federalTaxIdType">Tax ID Type</label>
                   <input
                     type="text" 
-                    id="business.federalTaxIdType"
+                    id="federalTaxIdType"
                     name="business.federalTaxIdType"
                     value={formData.business?.federalTaxIdType || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.mcc">MCC Code <span className="required">*</span></label>
+                  <label htmlFor="mcc">MCC</label>
                   <input
                     type="text"
-                    id="business.mcc"
+                    id="mcc"
                     name="business.mcc"
                     value={formData.business?.mcc || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
+              </div>
 
+              <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="business.phone">Business Phone <span className="required">*</span></label>
+                  <label htmlFor="businessPhone">Phone</label>
                   <input
-                    type="tel"
-                    id="business.phone"
+                    type="text"
+                    id="businessPhone"
                     name="business.phone"
                     value={formData.business?.phone || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.email">Business Email <span className="required">*</span></label>
+                  <label htmlFor="businessEmail">Email</label>
                   <input
                     type="email"
-                    id="business.email"
+                    id="businessEmail"
                     name="business.email"
                     value={formData.business?.email || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
-              </div>
 
-              <h3>Business Volume</h3>
-              <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="business.averageTicketAmount">Average Ticket Amount <span className="required">*</span></label>
+                  <label htmlFor="averageTicketAmount">Avg Ticket Amount</label>
                   <input
                     type="number"
-                    step="0.01"
-                    id="business.averageTicketAmount"
+                    id="averageTicketAmount"
                     name="business.averageTicketAmount"
                     value={formData.business?.averageTicketAmount || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.averageMonthlyVolume">Average Monthly Volume <span className="required">*</span></label>
+                  <label htmlFor="averageMonthlyVolume">Avg Monthly Volume</label>
                   <input
                     type="number"
-                    step="0.01"
-                    id="business.averageMonthlyVolume"
+                    id="averageMonthlyVolume"
                     name="business.averageMonthlyVolume"
                     value={formData.business?.averageMonthlyVolume || ''}
                     onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.highTicketAmount">High Ticket Amount <span className="required">*</span></label>
+                  <label htmlFor="highTicketAmount">High Ticket Amount</label>
                   <input
                     type="number"
-                    step="0.01"
-                    id="business.highTicketAmount"
+                    id="highTicketAmount"
                     name="business.highTicketAmount"
                     value={formData.business?.highTicketAmount || ''}
                     onChange={handleInputChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <h3>Business Transactions</h3>
-              <div className="form-group">
-                <label>Merchandise/Services Sold <span className="required">*</span></label>
-                <textarea
-                  id="business.merchandiseServicesSold"
-                  name="business.merchandiseServicesSold"
-                  className='w-full px-4 border border-gray-300 rounded-md ' 
-                  value={formData.business?.merchandiseServicesSold || ''}
-                  onChange={(e) => handleInputChange(e as any)}
-                  required
-                  rows={3}
-                />
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label htmlFor="business.percentOfBusinessTransactions.cardSwiped">Card Swiped (%) <span className="required">*</span></label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    id="business.percentOfBusinessTransactions.cardSwiped"
-                    name="business.percentOfBusinessTransactions.cardSwiped"
-                    value={formData.business?.percentOfBusinessTransactions?.cardSwiped || ''}
-                    onChange={handleInputChange}
-                    required
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted">Keyed Card Present (%) <span className="required">*</span></label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    id="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted"
-                    name="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted"
-                    value={formData.business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.percentOfBusinessTransactions.mailOrPhoneOrder">Mail/Phone Order (%) <span className="required">*</span></label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    id="business.percentOfBusinessTransactions.mailOrPhoneOrder"
-                    name="business.percentOfBusinessTransactions.mailOrPhoneOrder"
-                    value={formData.business?.percentOfBusinessTransactions?.mailOrPhoneOrder || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.percentOfBusinessTransactions.internet">Internet (%) <span className="required">*</span></label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    id="business.percentOfBusinessTransactions.internet"
-                    name="business.percentOfBusinessTransactions.internet"
-                    value={formData.business?.percentOfBusinessTransactions?.internet || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <h3>Business Contact</h3>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label htmlFor="business.businessContact.firstName">First Name <span className="required">*</span></label>
+                  <label htmlFor="merchandiseServicesSold">Merchandise/Services</label>
                   <input
                     type="text"
-                    id="business.businessContact.firstName"
-                    name="business.businessContact.firstName"
-                    value={formData.business?.businessContact?.firstName || ''}
+                    id="merchandiseServicesSold"
+                    name="business.merchandiseServicesSold"
+                    value={formData.business?.merchandiseServicesSold || ''}
                     onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.businessContact.lastName">Last Name <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    id="business.businessContact.lastName"
-                    name="business.businessContact.lastName"
-                    value={formData.business?.businessContact?.lastName || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.businessContact.socialSecurityNumber">SSN <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    id="business.businessContact.socialSecurityNumber"
-                    name="business.businessContact.socialSecurityNumber"
-                    value={formData.business?.businessContact?.socialSecurityNumber || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.businessContact.dateOfBirth">Date of Birth <span className="required">*</span></label>
-                  <input
-                    type="date"
-                    id="business.businessContact.dateOfBirth"
-                    name="business.businessContact.dateOfBirth"
-                    value={formData.business?.businessContact?.dateOfBirth || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.businessContact.phoneNumber">Phone Number <span className="required">*</span></label>
-                  <input
-                    type="tel"
-                    id="business.businessContact.phoneNumber"
-                    name="business.businessContact.phoneNumber"
-                    value={formData.business?.businessContact?.phoneNumber || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="business.businessContact.email">Email <span className="required">*</span></label>
-                  <input
-                    type="email"
-                    id="business.businessContact.email"
-                    name="business.businessContact.email"
-                    value={formData.business?.businessContact?.email || ''}
-                    onChange={handleInputChange}
-                    required
                   />
                 </div>
               </div>
 
-              <h3>Business Addresses</h3>
-              <div className="address-section">
-                <h4>DBA Address</h4>
+              <div className="array-section">
+                <div className="array-section-title">Business Transaction Percentages</div>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.dba.street">Street <span className="required">*</span></label>
+                    <label htmlFor="cardSwiped">Card Swiped (%)</label>
                     <input
-                      type="text"
-                      id="business.businessAddress.dba.street"
-                      name="business.businessAddress.dba.street"
-                      value={formData.business?.businessAddress?.dba?.street || ''}
+                      type="number"
+                      id="cardSwiped"
+                      name="business.percentOfBusinessTransactions.cardSwiped"
+                      value={formData.business?.percentOfBusinessTransactions?.cardSwiped || ''}
                       onChange={handleInputChange}
-                      required
+                      placeholder="%"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.dba.street2">Street 2</label>
+                    <label htmlFor="keyedCardPresentNotImprinted">Keyed Card Present (%)</label>
                     <input
-                      type="text"
-                      id="business.businessAddress.dba.street2"
-                      name="business.businessAddress.dba.street2"
-                      value={formData.business?.businessAddress?.dba?.street2 || ''}
+                      type="number"
+                      id="keyedCardPresentNotImprinted"
+                      name="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted"
+                      value={formData.business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted || ''}
                       onChange={handleInputChange}
+                      placeholder="%"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.dba.city">City <span className="required">*</span></label>
+                    <label htmlFor="mailOrPhoneOrder">Mail/Phone Order (%)</label>
                     <input
-                      type="text"
-                      id="business.businessAddress.dba.city"
-                      name="business.businessAddress.dba.city"
-                      value={formData.business?.businessAddress?.dba?.city || ''}
+                      type="number"
+                      id="mailOrPhoneOrder"
+                      name="business.percentOfBusinessTransactions.mailOrPhoneOrder"
+                      value={formData.business?.percentOfBusinessTransactions?.mailOrPhoneOrder || ''}
                       onChange={handleInputChange}
-                      required
+                      placeholder="%"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.dba.state">State <span className="required">*</span></label>
+                    <label htmlFor="internet">Internet (%)</label>
                     <input
-                      type="text"
-                      id="business.businessAddress.dba.state"
-                      name="business.businessAddress.dba.state"
-                      value={formData.business?.businessAddress?.dba?.state || ''}
+                      type="number"
+                      id="internet"
+                      name="business.percentOfBusinessTransactions.internet"
+                      value={formData.business?.percentOfBusinessTransactions?.internet || ''}
                       onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="business.businessAddress.dba.zipCode">Zip Code <span className="required">*</span></label>
-                    <input
-                      type="text"
-                      id="business.businessAddress.dba.zipCode"
-                      name="business.businessAddress.dba.zipCode"
-                      value={formData.business?.businessAddress?.dba?.zipCode || ''}
-                      onChange={handleInputChange}
-                      required
+                      placeholder="%"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="address-section">
-                <h4>Corporate Address</h4>
+              <div className="array-section">
+                <div className="array-section-title">Business Contact</div>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.corporate.street">Street <span className="required">*</span></label>
+                    <label htmlFor="contactFirstName">First Name</label>
                     <input
                       type="text"
-                      id="business.businessAddress.corporate.street"
-                      name="business.businessAddress.corporate.street"
-                      value={formData.business?.businessAddress?.corporate?.street || ''}
-                      onChange={handleInputChange}
-                      required
+                      id="contactFirstName"
+                      name="business.businessContact.firstName"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.corporate.street2">Street 2</label>
+                    <label htmlFor="contactLastName">Last Name</label>
                     <input
                       type="text"
-                      id="business.businessAddress.corporate.street2"
-                      name="business.businessAddress.corporate.street2"
-                      value={formData.business?.businessAddress?.corporate?.street2 || ''}
-                      onChange={handleInputChange}
+                      id="contactLastName"
+                      name="business.businessContact.lastName"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.corporate.city">City <span className="required">*</span></label>
+                    <label htmlFor="contactSSN">SSN</label>
                     <input
                       type="text"
-                      id="business.businessAddress.corporate.city"
-                      name="business.businessAddress.corporate.city"
-                      value={formData.business?.businessAddress?.corporate?.city || ''}
-                      onChange={handleInputChange}
-                      required
+                      id="contactSSN"
+                      name="business.businessContact.socialSecurityNumber"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.corporate.state">State <span className="required">*</span></label>
+                    <label htmlFor="contactDOB">Date of Birth</label>
                     <input
-                      type="text"
-                      id="business.businessAddress.corporate.state"
-                      name="business.businessAddress.corporate.state"
-                      value={formData.business?.businessAddress?.corporate?.state || ''}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="business.businessAddress.corporate.zipCode">Zip Code <span className="required">*</span></label>
-                    <input
-                      type="text"
-                      id="business.businessAddress.corporate.zipCode"
-                      name="business.businessAddress.corporate.zipCode"
-                      value={formData.business?.businessAddress?.corporate?.zipCode || ''}
-                      onChange={handleInputChange}
-                      required
+                      type="date"
+                      id="contactDOB"
+                      name="business.businessContact.dateOfBirth"
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="address-section">
-                <h4>Ship To Address</h4>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.shipTo.street">Street <span className="required">*</span></label>
+                    <label htmlFor="contactStreet">Street</label>
                     <input
                       type="text"
-                      id="business.businessAddress.shipTo.street"
-                      name="business.businessAddress.shipTo.street"
-                      value={formData.business?.businessAddress?.shipTo?.street || ''}
-                      onChange={handleInputChange}
-                      required
+                      id="contactStreet"
+                      name="business.businessContact.street"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.shipTo.street2">Street 2</label>
+                    <label htmlFor="contactStreet2">Street 2</label>
                     <input
                       type="text"
-                      id="business.businessAddress.shipTo.street2"
-                      name="business.businessAddress.shipTo.street2"
-                      value={formData.business?.businessAddress?.shipTo?.street2 || ''}
-                      onChange={handleInputChange}
+                      id="contactStreet2"
+                      name="business.businessContact.street2"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.shipTo.city">City <span className="required">*</span></label>
+                    <label htmlFor="contactZipCode">Zip Code</label>
                     <input
                       type="text"
-                      id="business.businessAddress.shipTo.city"
-                      name="business.businessAddress.shipTo.city"
-                      value={formData.business?.businessAddress?.shipTo?.city || ''}
-                      onChange={handleInputChange}
-                      required
+                      id="contactZipCode"
+                      name="business.businessContact.zipCode"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.shipTo.state">State <span className="required">*</span></label>
+                    <label htmlFor="contactCity">City</label>
                     <input
                       type="text"
-                      id="business.businessAddress.shipTo.state"
-                      name="business.businessAddress.shipTo.state"
-                      value={formData.business?.businessAddress?.shipTo?.state || ''}
-                      onChange={handleInputChange}
-                      required
+                      id="contactCity"
+                      name="business.businessContact.city"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="business.businessAddress.shipTo.zipCode">Zip Code <span className="required">*</span></label>
+                    <label htmlFor="contactState">State</label>
                     <input
                       type="text"
-                      id="business.businessAddress.shipTo.zipCode"
-                      name="business.businessAddress.shipTo.zipCode"
-                      value={formData.business?.businessAddress?.shipTo?.zipCode || ''}
-                      onChange={handleInputChange}
-                      required
+                      id="contactState"
+                      name="business.businessContact.state"
                     />
                   </div>
-                </div>
-              </div>
 
-              <h3>Bank Account Information</h3>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label htmlFor="bankAccount.abaRouting">ABA Routing Number <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    id="bankAccount.abaRouting"
-                    name="bankAccount.abaRouting"
-                    value={formData.bankAccount?.abaRouting || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
+                  <div className="form-group">
+                    <label htmlFor="contactPhoneNumber">Phone</label>
+                    <input
+                      type="text"
+                      id="contactPhoneNumber"
+                      name="business.businessContact.phoneNumber"
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="bankAccount.accountType">Account Type <span className="required">*</span></label>
-                  <select
-                    id="bankAccount.accountType"
-                    name="bankAccount.accountType"
-                    value={formData.bankAccount?.accountType || ''}
-                    onChange={handleInputChange}
-                    required
-                  >
-                    <option value="checking">Checking</option>
-                    <option value="savings">Savings</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="bankAccount.demandDepositAccount">Account Number <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    id="bankAccount.demandDepositAccount"
-                    name="bankAccount.demandDepositAccount"
-                    value={formData.bankAccount?.demandDepositAccount || ''}
-                    onChange={handleInputChange}
-                    required
-                  />
+                  <div className="form-group">
+                    <label htmlFor="contactEmail">Email</label>
+                    <input
+                      type="email"
+                      id="contactEmail"
+                      name="business.businessContact.email"
+                    />
+                  </div>
                 </div>
               </div>
             </FormSection>
-
 
             {/* Step 3: Principals & Additional Details */}
             <FormSection
@@ -1206,214 +979,220 @@ export default function MerchantApplication() {
               id="step3"
               title="Principals & Additional Details"
             >
-              <h3>Principals</h3>
-              {formData.principals?.map((principal, index) => (
-                <div key={index} className="principal-form">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].firstName`}>First Name <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].firstName`}
-                        name={`principals[${index}].firstName`}
-                        value={principal.firstName || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'firstName', e.target.value)}
-                        required
-                      />
+              <div id="principalsContainer">
+                {formData.principals?.map((principal, index) => (
+                  <div key={index} className="principal-form">
+                    <div className="array-section-title">Principal {index + 1}</div>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].firstName`}>First Name <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].firstName`}
+                          name={`principals[${index}].firstName`}
+                          value={principal.firstName || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'firstName', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].lastName`}>Last Name <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].lastName`}
+                          name={`principals[${index}].lastName`}
+                          value={principal.lastName || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'lastName', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].socialSecurityNumber`}>SSN <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].socialSecurityNumber`}
+                          name={`principals[${index}].socialSecurityNumber`}
+                          value={principal.socialSecurityNumber || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'socialSecurityNumber', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].dateOfBirth`}>Date of Birth <span className="required">*</span></label>
+                        <input
+                          type="date"
+                          id={`principals[${index}].dateOfBirth`}
+                          name={`principals[${index}].dateOfBirth`}
+                          value={principal.dateOfBirth || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'dateOfBirth', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].phoneNumber`}>Phone Number <span className="required">*</span></label>
+                        <input
+                          type="tel"
+                          id={`principals[${index}].phoneNumber`}
+                          name={`principals[${index}].phoneNumber`}
+                          value={principal.phoneNumber || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'phoneNumber', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].email`}>Email <span className="required">*</span></label>
+                        <input
+                          type="email"
+                          id={`principals[${index}].email`}
+                          name={`principals[${index}].email`}
+                          value={principal.email || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'email', e.target.value)}
+                          required
+                        />
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].lastName`}>Last Name <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].lastName`}
-                        name={`principals[${index}].lastName`}
-                        value={principal.lastName || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'lastName', e.target.value)}
-                        required
-                      />
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].street`}>Street <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].street`}
+                          name={`principals[${index}].street`}
+                          value={principal.street || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'street', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].street2`}>Street 2</label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].street2`}
+                          name={`principals[${index}].street2`}
+                          value={principal.street2 || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'street2', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].city`}>City <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].city`}
+                          name={`principals[${index}].city`}
+                          value={principal.city || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'city', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].state`}>State <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].state`}
+                          name={`principals[${index}].state`}
+                          value={principal.state || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'state', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].zipCode`}>Zip Code <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].zipCode`}
+                          name={`principals[${index}].zipCode`}
+                          value={principal.zipCode || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'zipCode', e.target.value)}
+                          required
+                        />
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].socialSecurityNumber`}>SSN <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].socialSecurityNumber`}
-                        name={`principals[${index}].socialSecurityNumber`}
-                        value={principal.socialSecurityNumber || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'socialSecurityNumber', e.target.value)}
-                        required
-                      />
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].equityOwnershipPercentage`}>Ownership % <span className="required">*</span></label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          id={`principals[${index}].equityOwnershipPercentage`}
+                          name={`principals[${index}].equityOwnershipPercentage`}
+                          value={principal.equityOwnershipPercentage || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'equityOwnershipPercentage', Number(e.target.value))}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].title`}>Title <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].title`}
+                          name={`principals[${index}].title`}
+                          value={principal.title || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'title', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].driverLicenseNumber`}>Driver License # <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].driverLicenseNumber`}
+                          name={`principals[${index}].driverLicenseNumber`}
+                          value={principal.driverLicenseNumber || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'driverLicenseNumber', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor={`principals[${index}].driverLicenseIssuedState`}>License State <span className="required">*</span></label>
+                        <input
+                          type="text"
+                          id={`principals[${index}].driverLicenseIssuedState`}
+                          name={`principals[${index}].driverLicenseIssuedState`}
+                          value={principal.driverLicenseIssuedState || ''}
+                          onChange={(e) => handlePrincipalChange(index, 'driverLicenseIssuedState', e.target.value)}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group checkbox-group">
+                        <input
+                          type="checkbox"
+                          id={`principals[${index}].isPersonalGuarantor`}
+                          name={`principals[${index}].isPersonalGuarantor`}
+                          checked={principal.isPersonalGuarantor || false}
+                          onChange={(e) => handlePrincipalChange(index, 'isPersonalGuarantor', e.target.checked)}
+                        />
+                        <label htmlFor={`principals[${index}].isPersonalGuarantor`}>Personal Guarantor</label>
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].dateOfBirth`}>Date of Birth <span className="required">*</span></label>
-                      <input
-                        type="date"
-                        id={`principals[${index}].dateOfBirth`}
-                        name={`principals[${index}].dateOfBirth`}
-                        value={principal.dateOfBirth || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'dateOfBirth', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].phoneNumber`}>Phone Number <span className="required">*</span></label>
-                      <input
-                        type="tel"
-                        id={`principals[${index}].phoneNumber`}
-                        name={`principals[${index}].phoneNumber`}
-                        value={principal.phoneNumber || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'phoneNumber', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].email`}>Email <span className="required">*</span></label>
-                      <input
-                        type="email"
-                        id={`principals[${index}].email`}
-                        name={`principals[${index}].email`}
-                        value={principal.email || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'email', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].street`}>Street <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].street`}
-                        name={`principals[${index}].street`}
-                        value={principal.street || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'street', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].street2`}>Street 2</label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].street2`}
-                        name={`principals[${index}].street2`}
-                        value={principal.street2 || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'street2', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].city`}>City <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].city`}
-                        name={`principals[${index}].city`}
-                        value={principal.city || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'city', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].state`}>State <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].state`}
-                        name={`principals[${index}].state`}
-                        value={principal.state || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'state', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].zipCode`}>Zip Code <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].zipCode`}
-                        name={`principals[${index}].zipCode`}
-                        value={principal.zipCode || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'zipCode', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].equityOwnershipPercentage`}>Ownership % <span className="required">*</span></label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        id={`principals[${index}].equityOwnershipPercentage`}
-                        name={`principals[${index}].equityOwnershipPercentage`}
-                        value={principal.equityOwnershipPercentage || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'equityOwnershipPercentage', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].title`}>Title <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].title`}
-                        name={`principals[${index}].title`}
-                        value={principal.title || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'title', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].driverLicenseNumber`}>Driver License # <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].driverLicenseNumber`}
-                        name={`principals[${index}].driverLicenseNumber`}
-                        value={principal.driverLicenseNumber || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'driverLicenseNumber', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label htmlFor={`principals[${index}].driverLicenseIssuedState`}>License State <span className="required">*</span></label>
-                      <input
-                        type="text"
-                        id={`principals[${index}].driverLicenseIssuedState`}
-                        name={`principals[${index}].driverLicenseIssuedState`}
-                        value={principal.driverLicenseIssuedState || ''}
-                        onChange={(e) => handlePrincipalChange(index, 'driverLicenseIssuedState', e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group checkbox-group">
-                      <input
-                        type="checkbox"
-                        id={`principals[${index}].isPersonalGuarantor`}
-                        name={`principals[${index}].isPersonalGuarantor`}
-                        checked={principal.isPersonalGuarantor || false}
-                        onChange={(e) => handlePrincipalChange(index, 'isPersonalGuarantor', e.target.checked)}
-                      />
-                      <label htmlFor={`principals[${index}].isPersonalGuarantor`}>Personal Guarantor</label>
-                    </div>
+                    {formData.principals && formData.principals.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePrincipal(index)}
+                        className="btn-danger"
+                      >
+                        Remove Principal
+                      </button>
+                    )}
                   </div>
-
-                  {formData.principals && formData.principals.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removePrincipal(index)}
-                      className="btn-danger"
-                    >
-                      Remove Principal
-                    </button>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
 
               <button
                 type="button"
@@ -1423,152 +1202,208 @@ export default function MerchantApplication() {
                 ➕ Add Principal
               </button>
 
-              <h3>Website Information</h3>
-              <div className="website-form">
+              <div className="form-group">
+                <label htmlFor="statementDeliveryMethod">Statement Delivery Method</label>
+                <input
+                  type="text"
+                  id="statementDeliveryMethod"
+                  name="business.statementDeliveryMethod"
+                  value={formData.business?.statementDeliveryMethod || ''}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div className="array-section">
+                <div className="array-section-title">Business Addresses</div>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="business.websites[0].url">Website URL <span className="required">*</span></label>
+                    <label htmlFor="dbaStreet">DBA Street</label>
                     <input
-                      type="url"
-                      id="business.websites[0].url"
-                      name="business.websites[0].url"
-                      value={formData.business?.websites?.[0]?.url || ''}
-                      onChange={(e) => {
-                        const updatedWebsites = [...(formData.business?.websites || [])];
-                        if (updatedWebsites.length === 0) {
-                          updatedWebsites.push({
-                            url: '',
-                            websiteCustomerServiceEmail: '',
-                            websiteCustomerServicePhoneNumber: ''
-                          });
-                        }
-                        updatedWebsites[0].url = e.target.value;
-                        setFormData(prev => ({
-                          ...prev,
-                          business: {
-                            ...prev.business!,
-                            websites: updatedWebsites
-                          }
-                        }));
-                      }}
-                      required
+                      type="text"
+                      id="dbaStreet"
+                      name="business.businessAddress.dba.street"
                     />
                   </div>
-
                   <div className="form-group">
-                    <label htmlFor="business.websites[0].websiteCustomerServiceEmail">Customer Service Email</label>
+                    <label htmlFor="dbaCity">DBA City</label>
                     <input
-                      type="email"
-                      id="business.websites[0].websiteCustomerServiceEmail"
-                      name="business.websites[0].websiteCustomerServiceEmail"
-                      value={formData.business?.websites?.[0]?.websiteCustomerServiceEmail || ''}
-                      onChange={(e) => {
-                        const updatedWebsites = [...(formData.business?.websites || [])];
-                        if (updatedWebsites.length === 0) {
-                          updatedWebsites.push({
-                            url: '',
-                            websiteCustomerServiceEmail: '',
-                            websiteCustomerServicePhoneNumber: ''
-                          });
-                        }
-                        updatedWebsites[0].websiteCustomerServiceEmail = e.target.value;
-                        setFormData(prev => ({
-                          ...prev,
-                          business: {
-                            ...prev.business!,
-                            websites: updatedWebsites
-                          }
-                        }));
-                      }}
+                      type="text"
+                      id="dbaCity"
+                      name="business.businessAddress.dba.city"
                     />
                   </div>
-
                   <div className="form-group">
-                    <label htmlFor="business.websites[0].websiteCustomerServicePhoneNumber">Customer Service Phone</label>
+                    <label htmlFor="dbaState">DBA State</label>
                     <input
-                      type="tel"
-                      id="business.websites[0].websiteCustomerServicePhoneNumber"
-                      name="business.websites[0].websiteCustomerServicePhoneNumber"
-                      value={formData.business?.websites?.[0]?.websiteCustomerServicePhoneNumber || ''}
-                      onChange={(e) => {
-                        const updatedWebsites = [...(formData.business?.websites || [])];
-                        if (updatedWebsites.length === 0) {
-                          updatedWebsites.push({
-                            url: '',
-                            websiteCustomerServiceEmail: '',
-                            websiteCustomerServicePhoneNumber: ''
-                          });
-                        }
-                        updatedWebsites[0].websiteCustomerServicePhoneNumber = e.target.value;
-                        setFormData(prev => ({
-                          ...prev,
-                          business: {
-                            ...prev.business!,
-                            websites: updatedWebsites
-                          }
-                        }));
-                      }}
+                      type="text"
+                      id="dbaState"
+                      name="business.businessAddress.dba.state"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="dbaZipCode">DBA Zip</label>
+                    <input
+                      type="text"
+                      id="dbaZipCode"
+                      name="business.businessAddress.dba.zipCode"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="corporateStreet">Corporate Street</label>
+                    <input
+                      type="text"
+                      id="corporateStreet"
+                      name="business.businessAddress.corporate.street"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="corporateCity">Corporate City</label>
+                    <input
+                      type="text"
+                      id="corporateCity"
+                      name="business.businessAddress.corporate.city"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="corporateState">Corporate State</label>
+                    <input
+                      type="text"
+                      id="corporateState"
+                      name="business.businessAddress.corporate.state"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="corporateZipCode">Corporate Zip</label>
+                    <input
+                      type="text"
+                      id="corporateZipCode"
+                      name="business.businessAddress.corporate.zipCode"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="shipToStreet">ShipTo Street</label>
+                    <input
+                      type="text"
+                      id="shipToStreet"
+                      name="business.businessAddress.shipTo.street"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="shipToCity">ShipTo City</label>
+                    <input
+                      type="text"
+                      id="shipToCity"
+                      name="business.businessAddress.shipTo.city"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="shipToState">ShipTo State</label>
+                    <input
+                      type="text"
+                      id="shipToState"
+                      name="business.businessAddress.shipTo.state"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="shipToZipCode">ShipTo Zip</label>
+                    <input
+                      type="text"
+                      id="shipToZipCode"
+                      name="business.businessAddress.shipTo.zipCode"
                     />
                   </div>
                 </div>
               </div>
 
-              <h3>EBT Information</h3>
-              <div className="ebt-form">
+              <div className="array-section">
+                <div className="array-section-title">Website Information</div>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label htmlFor="business.businessServicesRequested[0].ebt[0].ebtType">EBT Type <span className="required">*</span></label>
-                    <select
-                      id="business.businessServicesRequested[0].ebt[0].ebtType"
-                      name="business.businessServicesRequested[0].ebt[0].ebtType"
-                      value={formData.business?.businessServicesRequested?.[0]?.ebt?.[0]?.ebtType || ''}
-                      onChange={(e) => {
-                        const updatedServices = [...(formData.business?.businessServicesRequested || [])];
-                        if (updatedServices.length === 0) {
-                          updatedServices.push({ ebt: [{ ebtType: '', ebtAccountNumber: '' }] });
-                        } else if (!updatedServices[0].ebt || updatedServices[0].ebt.length === 0) {
-                          updatedServices[0].ebt = [{ ebtType: '', ebtAccountNumber: '' }];
-                        }
-                        updatedServices[0].ebt[0].ebtType = e.target.value;
-                        setFormData(prev => ({
-                          ...prev,
-                          business: {
-                            ...prev.business!,
-                            businessServicesRequested: updatedServices
-                          }
-                        }));
-                      }}
-                      required
-                    >
-                      <option value="">Select EBT Type</option>
-                      <option value="SNAP">SNAP</option>
-                      <option value="TANF">TANF</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="business.businessServicesRequested[0].ebt[0].ebtAccountNumber">EBT Account Number</label>
+                    <label htmlFor="websiteUrl">Website URL</label>
                     <input
                       type="text"
-                      id="business.businessServicesRequested[0].ebt[0].ebtAccountNumber"
+                      id="websiteUrl"
+                      name="business.websites[0].url"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="websiteCustomerServiceEmail">Customer Service Email</label>
+                    <input
+                      type="email"
+                      id="websiteCustomerServiceEmail"
+                      name="business.websites[0].websiteCustomerServiceEmail"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="websiteCustomerServicePhoneNumber">Customer Service Phone</label>
+                    <input
+                      type="text"
+                      id="websiteCustomerServicePhoneNumber"
+                      name="business.websites[0].websiteCustomerServicePhoneNumber"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="array-section">
+                <div className="array-section-title">EBT Services</div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="ebtType">EBT Type</label>
+                    <input
+                      type="text"
+                      id="ebtType"
+                      name="business.businessServicesRequested[0].ebt[0].ebtType"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="ebtAccountNumber">EBT Account Number</label>
+                    <input
+                      type="text"
+                      id="ebtAccountNumber"
                       name="business.businessServicesRequested[0].ebt[0].ebtAccountNumber"
-                      value={formData.business?.businessServicesRequested?.[0]?.ebt?.[0]?.ebtAccountNumber || ''}
-                      onChange={(e) => {
-                        const updatedServices = [...(formData.business?.businessServicesRequested || [])];
-                        if (updatedServices.length === 0) {
-                          updatedServices.push({ ebt: [{ ebtType: '', ebtAccountNumber: '' }] });
-                        } else if (!updatedServices[0].ebt || updatedServices[0].ebt.length === 0) {
-                          updatedServices[0].ebt = [{ ebtType: '', ebtAccountNumber: '' }];
-                        }
-                        updatedServices[0].ebt[0].ebtAccountNumber = e.target.value;
-                        setFormData(prev => ({
-                          ...prev,
-                          business: {
-                            ...prev.business!,
-                            businessServicesRequested: updatedServices
-                          }
-                        }));
-                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="array-section">
+                <div className="array-section-title">Bank Account Information</div>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="abaRouting">ABA Routing</label>
+                    <input
+                      type="text"
+                      id="abaRouting"
+                      name="bankAccount.abaRouting"
+                      value={formData.bankAccount?.abaRouting || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="accountType">Account Type</label>
+                    <input
+                      type="text"
+                      id="accountType"
+                      name="bankAccount.accountType"
+                      value={formData.bankAccount?.accountType || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="demandDepositAccount">Demand Deposit Account</label>
+                    <input
+                      type="text"
+                      id="demandDepositAccount"
+                      name="bankAccount.demandDepositAccount"
+                      value={formData.bankAccount?.demandDepositAccount || ''}
+                      onChange={handleInputChange}
                     />
                   </div>
                 </div>

@@ -8,9 +8,9 @@ const ThankYouMessage = ({ submissionResponse, validationResponse, onBack }) => 
       
       <div className="application-number mb-6">
         {/* Application ID:  */}
-        <span className="font-semibold">
+        {/* <span className="font-semibold">
           {submissionResponse?.applicationId || submissionResponse?.id || 'Pending'}
-        </span>
+        </span> */}
       </div>
       
       {/* Add validation status display */}

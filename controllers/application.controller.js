@@ -2,13 +2,13 @@ const axios = require('axios');
 const { handleApiError } = require('../utils/errorHandler');
 const applicationService = require('../services/application.service');
 const emailService = require('../services/email.service');
+const mailerService = require('../services/mailer.service');
 
 exports.createApplication = async (req, res) => {
   try {
-    // First save to MongoDB with all data including email
     const savedApplication = await applicationService.createApplication(req.body);
-    
-    // Then send to PaymentsHub API
+
+    // Call PaymentsHub API
     const response = await axios.post(
       "https://enrollment-api-sandbox.paymentshub.com/enroll/application",
       req.body,
@@ -19,7 +19,14 @@ exports.createApplication = async (req, res) => {
         },
       }
     );
-    
+
+    // Send email automatically
+    await mailerService.sendMerchantDetails(
+      req.body.email,
+      req.body.externalKey,
+      req.body.business?.corporateName || req.body.applicationName
+    );
+
     res.json({
       mongoApplication: savedApplication,
       paymentsHubResponse: response.data

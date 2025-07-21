@@ -10,11 +10,15 @@ const GenerateLinkSection = ({
   const [externalKey, setExternalKey] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleGenerateLink = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       await onGenerateLink(externalKey);
+    } catch (err) {
+      setError(err.message || 'Failed to generate link');
     } finally {
       setIsLoading(false);
     }
@@ -22,8 +26,11 @@ const GenerateLinkSection = ({
 
   const handleSendEmail = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       await onSendEmail(email, externalKey);
+    } catch (err) {
+      setError(err.message || 'Failed to send email');
     } finally {
       setIsLoading(false);
     }
@@ -62,6 +69,12 @@ const GenerateLinkSection = ({
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mt-4 p-3 bg-red-600 text-white rounded-md">
+          {error}
+        </div>
+      )}
 
       {merchantLink && (
         <div className="bg-gray-700 p-4 rounded-md mb-4">

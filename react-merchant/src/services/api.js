@@ -119,14 +119,22 @@ export const updateApplication = async (externalKey, formData) => {
   }
 };
 
+export const getDocumentTypes = async () => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/applications/document-types`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to fetch document types');
+  }
+};
+
 export const uploadDocument = async (externalKey, file, type) => {
   try {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
 
-    const response = await api.post(
-      `/applications/${externalKey}/documents`,
+    const response = await axios.post(`${API_BASE_URL}/applications/${externalKey}/documents`,
       formData,
       {
         headers: {
@@ -136,7 +144,7 @@ export const uploadDocument = async (externalKey, file, type) => {
     );
     return response.data;
   } catch (error) {
-    throw error.response?.data?.message || 'Failed to upload document';
+    throw new Error(error.response?.data?.message || 'Failed to upload document');
   }
 };
 
@@ -146,6 +154,35 @@ export const deleteDocument = async (externalKey, documentId) => {
     return response.data;
   } catch (error) {
     throw error.response?.data?.message || 'Failed to delete document';
+  }
+};
+
+export const downloadApplicationPDF = async (externalKey) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/applications/pdf/${externalKey}`, {
+      responseType: 'blob',
+      headers: {
+        'Accept': 'application/pdf'
+      }
+    });
+
+    // Create a URL for the blob
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    
+    // Create a temporary link element
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `application-${externalKey}.pdf`);
+    
+    // Append to body, click, and remove
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    throw new Error(error.response?.data?.message || 'Failed to download PDF');
   }
 };
 

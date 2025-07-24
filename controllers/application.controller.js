@@ -36,12 +36,14 @@ exports.createApplication = async (req, res) => {
       }
     );
 
-    // Send email automatically
-    await applicationService.sendMerchantLinkEmail(
-      req.body.email,
-      req.body.externalKey,
-      req.body.business?.corporateName || req.body.applicationName
-    );
+    // Only send email if sendEmail query param is true
+    if (req.query.sendEmail === 'true') {
+      await applicationService.sendMerchantLinkEmail(
+        req.body.applicationEmail,
+        req.body.externalKey,
+        req.body.business?.corporateName || req.body.applicationName
+      );
+    }
 
     res.json({
       mongoApplication: savedApplication,
@@ -217,7 +219,7 @@ exports.generateMerchantLink = async (req, res) => {
     }
 
     // Generate the merchant link
-    const { link } = await applicationService.generateMerchantLink(externalKey);
+    const { link, applicationEmail } = await applicationService.generateMerchantLink(externalKey);
 
     // Update application status
     await applicationService.changeApplicationStatus(externalKey, 'link_generated');
@@ -225,7 +227,8 @@ exports.generateMerchantLink = async (req, res) => {
     res.json({
       status: 'success',
       message: 'Merchant link generated successfully',
-      link
+      link,
+      applicationEmail
     });
   } catch (error) {
     handleApiError(res, error);
@@ -268,6 +271,19 @@ exports.sendMerchantLinkEmail = async (req, res) => {
   }
 };
 
+exports.getDocumentTypes = async (req, res) => {
+  try {
+    const response = await applicationService.getDocumentTypes(req.accessToken);
+    res.json(response);
+  } catch (error) {
+    console.error('Error in getDocumentTypes controller:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to fetch document types'
+    });
+  }
+};
+
 exports.uploadDocument = async (req, res) => {
   try {
     upload(req, res, async (err) => {
@@ -280,6 +296,7 @@ exports.uploadDocument = async (req, res) => {
 
       const { externalKey } = req.params;
       const { type } = req.body;
+      let s3Url = null;
 
       if (!req.file) {
         return res.status(400).json({
@@ -288,24 +305,31 @@ exports.uploadDocument = async (req, res) => {
         });
       }
 
-      if (!type || !['voided_check', 'bank_statement', 'processing_statement'].includes(type)) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Invalid document type'
-        });
-      }
-
       try {
         // Generate unique key for S3
         const key = `applications/${externalKey}/documents/${Date.now()}-${req.file.originalname}`;
         
         // Upload to S3
-        const url = await s3Service.uploadFile(req.file, key);
+        s3Url = await s3Service.uploadFile(req.file, key);
+
+        // Convert file to base64 for PaymentsHub
+        const base64File = req.file.buffer.toString('base64');
+
+        // Upload to PaymentsHub
+        const paymentsHubResponse = await applicationService.uploadDocumentToPaymentsHub(
+          externalKey,
+          {
+            fileName: req.file.originalname,
+            fileType: type,
+            attachment: base64File
+          },
+          req.accessToken
+        );
 
         // Save document info to MongoDB
         const updatedApplication = await applicationService.addDocument(externalKey, {
           type,
-          url,
+          url: s3Url,
           key,
           originalName: req.file.originalname
         });
@@ -313,18 +337,20 @@ exports.uploadDocument = async (req, res) => {
         res.json({
           status: 'success',
           message: 'Document uploaded successfully',
-          document: updatedApplication.documents[updatedApplication.documents.length - 1]
+          document: updatedApplication.documents[updatedApplication.documents.length - 1],
+          paymentsHubResponse
         });
       } catch (error) {
-        // If MongoDB save fails, try to delete the uploaded file from S3
-        if (error && url) {
+        // If any error occurs and we've uploaded to S3, try to delete the file
+        if (s3Url) {
           try {
             await s3Service.deleteFile(key);
           } catch (s3Error) {
-            console.error('Failed to delete S3 file after MongoDB error:', s3Error);
+            console.error('Failed to delete S3 file after error:', s3Error);
           }
         }
 
+        // Send error response
         res.status(500).json({
           status: 'error',
           message: error.message || 'Failed to upload document'
@@ -385,5 +411,28 @@ exports.deleteApplication = async (req, res) => {
     res.json({ message: 'Application deleted successfully' });
   } catch (error) {
     handleApiError(res, error);
+  }
+};
+
+exports.getApplicationPDF = async (req, res) => {
+  try {
+    const { externalKey } = req.params;
+    const pdfBuffer = await applicationService.getApplicationPDF(externalKey, req.accessToken);
+    
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=application-${externalKey}.pdf`);
+    
+    // Send the PDF buffer
+    res.send(pdfBuffer);
+  } catch (error) {
+    if (error.message === 'Application PDF not found') {
+      res.status(404).json({
+        status: 'error',
+        message: 'Application PDF not found'
+      });
+    } else {
+      handleApiError(res, error);
+    }
   }
 };

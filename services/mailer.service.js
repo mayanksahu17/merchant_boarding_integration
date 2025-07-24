@@ -43,11 +43,11 @@ exports.sendMerchantDetails = async (email, externalKey, businessName) => {
   const merchantFormURL = `${config.frontendUrl}/merchant-form?key=${encodeURIComponent(externalKey)}`;
 
   const mailOptions = {
-    from: `"ZifyBot Onboarding" <${config.email}>`,
+    from: `"Zifypay Onboarding" <${config.email}>`,
     to: email,
     subject: 'Complete Your Merchant Application',
     html: `
-      <h2>Hi from ZifyBot 👋</h2>
+      <h2>Hi from Zifypay Team 👋</h2>
       <p>Your application for <strong>${businessName || 'your business'}</strong> has been created.</p>
       <p>Please click the button below to complete your merchant onboarding:</p>
       <p style="margin: 20px 0;">
@@ -62,7 +62,7 @@ exports.sendMerchantDetails = async (email, externalKey, businessName) => {
       </p>
       <p>This link will allow you to fill out your merchant application details.</p>
       <p>Need help? Just reply to this email.</p>
-      <p>Best regards,<br/>ZifyBot Team</p>
+      <p>Best regards,<br/>Zifypay Team</p>
     `
   };
 

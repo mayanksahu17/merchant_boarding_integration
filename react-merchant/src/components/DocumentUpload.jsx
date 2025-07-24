@@ -1,173 +1,177 @@
-import React, { useState } from 'react';
-import { uploadDocument, deleteDocument } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { uploadDocument, getDocumentTypes } from '../services/api';
 
 const DocumentUpload = ({ externalKey, documents, onDocumentUpdate, bankVerificationRequired }) => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedType, setSelectedType] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [documentTypes, setDocumentTypes] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const bankDocumentTypes = [
-    { 
-      value: 'voided_check', 
-      label: 'Voided Check',
-      description: 'Voided check from the business bank account'
-    },
-    { 
-      value: 'bank_statement', 
-      label: 'Bank Statement',
-      description: 'Recent bank statement (within last 3 months)'
-    },
-    { 
-      value: 'processing_statement', 
-      label: 'Processing Statement',
-      description: 'Recent merchant processing statement'
+  useEffect(() => {
+    const fetchDocumentTypes = async () => {
+      try {
+        const response = await getDocumentTypes();
+        if (response.status === 'success' && Array.isArray(response.data)) {
+          setDocumentTypes(response.data);
+        } else {
+          setError('Invalid document types data received');
+        }
+      } catch (error) {
+        console.error('Error fetching document types:', error);
+        setError('Failed to load document types');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDocumentTypes();
+  }, []);
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (6MB limit)
+      if (file.size > 6 * 1024 * 1024) {
+        setError('File size exceeds 6MB limit');
+        return;
+      }
+
+      // Check file type
+      const validTypes = ['image/png', 'image/gif', 'image/jpeg', 'image/tiff', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        setError('Invalid file type. Allowed types: PNG, GIF, JPEG, TIFF, PDF');
+        return;
+      }
+
+      setSelectedFile(file);
+      setError(null);
     }
-  ];
+  };
 
-  const handleFileUpload = async (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedType) {
+      setError('Please select both a file and document type');
+      return;
+    }
 
     setIsUploading(true);
     setError(null);
 
     try {
-      const result = await uploadDocument(externalKey, file, type);
-      onDocumentUpdate(result.document);
-    } catch (err) {
-      setError(err.message || 'Failed to upload document');
+      const response = await uploadDocument(externalKey, selectedFile, selectedType);
+      onDocumentUpdate(response.document);
+      setSelectedFile(null);
+      setSelectedType('');
+      document.getElementById('file-upload').value = '';
+    } catch (error) {
+      setError(error.message);
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDelete = async (documentId) => {
-    if (!window.confirm('Are you sure you want to delete this document? You will need to upload another bank verification document.')) return;
-
-    setIsUploading(true);
-    setError(null);
-
-    try {
-      await deleteDocument(externalKey, documentId);
-      onDocumentUpdate(null, documentId);
-    } catch (err) {
-      setError(err.message || 'Failed to delete document');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const hasBankDocument = () => {
-    return documents?.some(doc => 
-      bankDocumentTypes.map(type => type.value).includes(doc.type)
-    );
-  };
-
-  const getUploadedDocument = () => {
-    return documents?.find(doc => 
-      bankDocumentTypes.map(type => type.value).includes(doc.type)
-    );
-  };
+  if (isLoading) {
+    return <div className="text-center text-gray-400">Loading document types...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="bg-gray-800 p-6 rounded-lg">
-        <h3 className="text-xl font-semibold text-gray-200 mb-4">Bank Account Verification</h3>
+      <div className="bg-gray-700 p-6 rounded-lg">
+        <h3 className="text-xl font-semibold text-white mb-4">Document Upload</h3>
         
-        {error && (
-          <div className="bg-red-600 text-white p-3 rounded-md mb-4">
-            {error}
+        {bankVerificationRequired && (
+          <div className="mb-4 p-4 bg-yellow-600 text-white rounded">
+            ⚠️ Bank verification document required before submission
           </div>
         )}
 
-        {bankVerificationRequired && (
-          <div className="bg-yellow-600 text-white p-4 rounded-md mb-6">
-            <p className="font-medium">Bank Account Verification Required</p>
-            <p className="mt-2">
-              We were unable to automatically verify this merchant's bank account information. 
-              Please upload <span className="font-semibold">any one</span> of the following documents:
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Document Type
+            </label>
+            <select
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
+            >
+              <option value="">Select document type</option>
+              {documentTypes.map((docType) => (
+                <option key={docType.fileType} value={docType.fileType}>
+                  {docType.fileTypeDescription}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">
+              Select File
+            </label>
+            <input
+              id="file-upload"
+              type="file"
+              onChange={handleFileSelect}
+              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white"
+              accept=".pdf,.png,.gif,.jpeg,.jpg,.tiff"
+            />
+            <p className="mt-1 text-sm text-gray-400">
+              Max file size: 6MB. Supported formats: PDF, PNG, GIF, JPEG, TIFF
             </p>
           </div>
-        )}
 
-        <div className="bg-gray-700 p-6 rounded-lg mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="text-gray-200 font-medium">
-              Bank Verification Documents
-              {bankVerificationRequired && !hasBankDocument() && (
-                <span className="text-red-400 ml-2">* Any one required</span>
-              )}
-            </h4>
-            {hasBankDocument() && (
-              <span className="text-green-400 text-sm">✓ Bank verification document uploaded</span>
-            )}
-          </div>
+          {error && (
+            <div className="p-3 bg-red-600 text-white rounded">
+              {error}
+            </div>
+          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {bankDocumentTypes.map(({ value, label, description }) => {
-              const uploadedDoc = documents?.find(doc => doc.type === value);
-              const anyDocUploaded = hasBankDocument();
-              const isDisabled = anyDocUploaded && !uploadedDoc;
-              
+          <button
+            onClick={handleUpload}
+            disabled={!selectedFile || !selectedType || isUploading}
+            className={`w-full px-4 py-2 rounded font-medium ${
+              isUploading || !selectedFile || !selectedType
+                ? 'bg-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'
+            } text-white`}
+          >
+            {isUploading ? 'Uploading...' : 'Upload Document'}
+          </button>
+        </div>
+      </div>
+
+      {documents.length > 0 && (
+        <div className="bg-gray-700 p-6 rounded-lg">
+          <h4 className="text-lg font-semibold text-white mb-4">Uploaded Documents</h4>
+          <div className="space-y-3">
+            {documents.map((doc) => {
+              // Find the document type description
+              const docTypeInfo = documentTypes.find(dt => dt.fileType === doc.type) || { fileTypeDescription: doc.type };
               return (
-                <div key={value} className={`p-4 bg-gray-600 rounded-lg ${isDisabled ? 'opacity-50' : ''}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <h5 className="text-gray-200 font-medium">
-                      {label}
-                      {uploadedDoc && <span className="text-green-400 ml-2">✓</span>}
-                    </h5>
+                <div
+                  key={doc._id}
+                  className="flex items-center justify-between p-3 bg-gray-600 rounded"
+                >
+                  <div>
+                    <p className="text-white">{docTypeInfo.fileTypeDescription}</p>
+                    <p className="text-sm text-gray-400">{doc.originalName}</p>
                   </div>
-                  <p className="text-gray-400 text-sm mb-3">{description}</p>
-                  
-                  {uploadedDoc ? (
-                    <div className="flex items-center justify-between bg-gray-700 p-2 rounded">
-                      <a 
-                        href={uploadedDoc.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 text-sm truncate max-w-[200px]"
-                      >
-                        {uploadedDoc.originalName}
-                      </a>
-                      <button
-                        onClick={() => handleDelete(uploadedDoc._id)}
-                        className="text-red-400 hover:text-red-300 ml-2"
-                        disabled={isUploading}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      <input
-                        type="file"
-                        onChange={(e) => handleFileUpload(e, value)}
-                        className="block w-full text-sm text-gray-400
-                          file:mr-4 file:py-2 file:px-4
-                          file:rounded-full file:border-0
-                          file:text-sm file:font-semibold
-                          file:bg-blue-600 file:text-white
-                          hover:file:bg-blue-700
-                          disabled:opacity-50"
-                        disabled={isUploading || isDisabled}
-                        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                      />
-                      {isDisabled ? (
-                        <p className="text-yellow-400 text-xs mt-1">
-                          Another document is already uploaded. Delete it first to upload this type.
-                        </p>
-                      ) : (
-                        <p className="text-gray-500 text-xs mt-1">
-                          Accepted formats: PDF, JPG, PNG, DOC
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <a
+                    href={doc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    View
+                  </a>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

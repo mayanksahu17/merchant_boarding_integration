@@ -1,9 +1,12 @@
 const Application = require('../models/application.model');
+const { sendMerchantDetails } = require('./mailer.service');
+const axios = require('axios');
 
 const createApplication = async (applicationData) => {
   const application = new Application({
     ...applicationData,
     status: 'pending',
+    applicationEmail: applicationData.email,
     createdAt: new Date(),
     updatedAt: new Date()
   });
@@ -57,7 +60,10 @@ const generateMerchantLink = async (externalKey) => {
 
   // If link already exists, return it
   if (application.merchantLink) {
-    return { link: application.merchantLink };
+    return { 
+      link: application.merchantLink,
+      applicationEmail: application.applicationEmail 
+    };
   }
   
   // Generate a new link
@@ -68,10 +74,13 @@ const generateMerchantLink = async (externalKey) => {
   application.merchantLink = link;
   await application.save();
   
-  return { link };
+  return { 
+    link,
+    applicationEmail: application.applicationEmail 
+  };
 };
 
-const sendMerchantLinkEmail = async (email, externalKey, applicationName) => {
+const sendMerchantLinkEmail = async (email, externalKey, applicationName, updateStatus = true) => {
   const application = await Application.findOne({ externalKey });
   if (!application) {
     throw new Error('Application not found');
@@ -81,12 +90,15 @@ const sendMerchantLinkEmail = async (email, externalKey, applicationName) => {
   const { link } = await generateMerchantLink(externalKey);
 
   // Send email using your email service
+  await sendMerchantDetails(email, externalKey, applicationName);
   // This is a placeholder - implement your email sending logic here
   console.log(`Sending email to ${email} with link ${link}`);
 
-  // Update application status
-  application.status = 'email_sent';
-  await application.save();
+  // Update application status only if updateStatus is true
+  if (updateStatus) {
+    application.status = 'email_sent';
+    await application.save();
+  }
 
   return { link };
 };
@@ -172,6 +184,103 @@ const submitToUnderwriting = async (externalKey) => {
   return await application.save();
 };
 
+const getApplicationPDF = async (externalKey, accessToken) => {
+  try {
+    const response = await axios.get(
+      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/pdf/key/${externalKey}`,
+      {
+        responseType: 'arraybuffer',
+        headers: {
+          'Accept': 'application/pdf',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+
+    // Check if the response is an error (PaymentsHub sends JSON errors even with arraybuffer response)
+    const contentType = response.headers['content-type'];
+    if (contentType && contentType.includes('application/json')) {
+      // Convert arraybuffer to string to parse error
+      const decoder = new TextDecoder('utf-8');
+      const errorJson = JSON.parse(decoder.decode(response.data));
+      throw new Error(errorJson.data?.errors || 'Failed to fetch PDF');
+    }
+
+    return response.data;
+  } catch (error) {
+    if (error.response) {
+      if (error.response.status === 404) {
+        throw new Error('Application PDF not found');
+      }
+      // Try to parse error message if it's JSON
+      if (error.response.data) {
+        try {
+          const decoder = new TextDecoder('utf-8');
+          const errorJson = JSON.parse(decoder.decode(error.response.data));
+          throw new Error(errorJson.data?.errors || 'Failed to fetch PDF');
+        } catch (e) {
+          // If parsing fails, use generic error
+          throw new Error('Failed to fetch PDF');
+        }
+      }
+    }
+    throw error;
+  }
+};
+
+const getDocumentTypes = async (accessToken) => {
+  try {
+    const response = await axios.get(
+      'https://enrollment-api-sandbox.paymentshub.com/enroll/document/type/list',
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // Transform the response to match our API format
+    if (response.data && response.data.data) {
+      return {
+        status: 'success',
+        data: response.data.data
+      };
+    }
+
+    return {
+      status: 'success',
+      data: [] // Return empty array if no data
+    };
+  } catch (error) {
+    console.error('Error fetching document types:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch document types');
+  }
+};
+
+const uploadDocumentToPaymentsHub = async (externalKey, documentData, accessToken) => {
+  try {
+    const response = await axios.put(
+      `https://enrollment-api-sandbox.paymentshub.com/enroll/document/upload/key/${externalKey}`,
+      {
+        fileName: documentData.fileName,
+        fileType: documentData.fileType,
+        attachment: documentData.attachment // Base64 encoded file
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading document to PaymentsHub:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   createApplication,
   getApplicationByExternalKey,
@@ -185,5 +294,8 @@ module.exports = {
   removeDocument,
   validateDocuments,
   validateBankDocuments,
-  submitToUnderwriting
+  submitToUnderwriting,
+  getApplicationPDF,
+  getDocumentTypes,
+  uploadDocumentToPaymentsHub
 };

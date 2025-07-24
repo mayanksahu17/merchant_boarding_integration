@@ -4,6 +4,7 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import ProgressBar from '../components/ProgressBar';
 import ThankYouMessage from '../components/ThankYouMessage';
 import ErrorModal from '../components/ErrorModal';
+import DocumentUpload from '../components/DocumentUpload';
 import {
   getApplication,
   validateApplication,
@@ -86,6 +87,8 @@ const MerchantForm = () => {
   const [validationResponse, setValidationResponse] = useState(null);
   const [isExistingApplication, setIsExistingApplication] = useState(false);
   const [errors, setErrors] = useState(null);
+  const [documents, setDocuments] = useState([]);
+  const [bankVerificationRequired, setBankVerificationRequired] = useState(false);
 
   const formatDateForInput = (date) => {
     if (!date) return '';
@@ -161,6 +164,7 @@ const MerchantForm = () => {
       if (data) {
         const appData = data.mongoApplication || data.paymentsHubResponse || data;
         setFormData(formatDatesInResponse(appData));
+        setDocuments(appData.documents || []);
       }
     } catch (error) {
       console.error('Error loading application data:', error);
@@ -226,11 +230,38 @@ const MerchantForm = () => {
     }
   };
 
+  const handleDocumentUpdate = (newDocument, deletedDocumentId) => {
+    if (deletedDocumentId) {
+      setDocuments(prev => prev.filter(doc => doc._id !== deletedDocumentId));
+    } else if (newDocument) {
+      setDocuments(prev => [...prev, newDocument]);
+    }
+  };
+
+  const validateBankInfo = () => {
+    // This is a placeholder function - implement actual bank validation logic
+    const requiresVerification = true; // This should be determined by your business logic
+    setBankVerificationRequired(requiresVerification);
+    return requiresVerification;
+  };
+
   const submitForm = async () => {
     setIsLoading(true);
     setLoadingMessage('Validating application...');
     try {
       await saveForm();
+
+      // Validate bank information
+      const needsBankVerification = validateBankInfo();
+
+      // Check if at least one bank verification document is uploaded
+      const bankDocs = ['voided_check', 'bank_statement', 'processing_statement'];
+      const hasBankDoc = documents.some(doc => bankDocs.includes(doc.type));
+
+      if (needsBankVerification && !hasBankDoc) {
+        throw new Error('Please upload at least one bank verification document (Voided check, Bank statement, or Processing statement)');
+      }
+
       const validateData = await validateApplication(formData.externalKey);
       setValidationResponse(validateData);
       if (validateData) {
@@ -244,7 +275,7 @@ const MerchantForm = () => {
       if (error.response && error.response.data && error.response.data.errors) {
         setErrors(error.response.data.errors);
       } else {
-        setErrors({ general: ['Failed to submit application. Please try again.'] });
+        setErrors({ general: [error.message || 'Failed to submit application. Please try again.'] });
       }
     } finally {
       setIsLoading(false);
@@ -1617,6 +1648,14 @@ const MerchantForm = () => {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="mt-8">
+              <DocumentUpload
+                externalKey={formData.externalKey}
+                documents={documents}
+                onDocumentUpdate={handleDocumentUpdate}
+                bankVerificationRequired={bankVerificationRequired}
+              />
             </div>
             <div className="mt-8 flex flex-col sm:flex-row justify-between gap-4">
               <button

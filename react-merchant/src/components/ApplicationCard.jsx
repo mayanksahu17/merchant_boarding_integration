@@ -1,100 +1,89 @@
-import { APPLICATION_STATUSES } from '../constants';
+import React from 'react';
 
-const ApplicationCard = ({ application, onDelete, onSubmit, onView }) => {
-  const statusColor = {
-    [APPLICATION_STATUSES.PENDING]: 'bg-yellow-500',
-    [APPLICATION_STATUSES.SUBMITTED]: 'bg-blue-500',
-    [APPLICATION_STATUSES.VALIDATED]: 'bg-green-500',
-    [APPLICATION_STATUSES.ERROR]: 'bg-red-500',
-    [APPLICATION_STATUSES.UNDERWRITING]: 'bg-purple-500',
-    [APPLICATION_STATUSES.APPROVED]: 'bg-green-600',
-    [APPLICATION_STATUSES.REJECTED]: 'bg-red-600',
-  }[application.status] || 'bg-gray-500';
+const ApplicationCard = ({ application, onSubmit, onDelete, onView, onGenerateLink }) => {
+  const documentTypes = {
+    voided_check: 'Voided Check',
+    bank_statement: 'Bank Statement',
+    processing_statement: 'Processing Statement'
+  };
+
+  const getBankDocumentStatus = () => {
+    const bankDocs = application.documents?.filter(doc => 
+      ['voided_check', 'bank_statement', 'processing_statement'].includes(doc.type)
+    ) || [];
+
+    if (bankDocs.length === 0) {
+      return (
+        <span className="text-yellow-400">
+          ⚠️ Bank verification document required
+        </span>
+      );
+    }
+
+    const uploadedDoc = bankDocs[0];
+    return (
+      <div>
+        <span className="text-green-400">✓ Bank verification document uploaded</span>
+        <div className="text-sm text-gray-400 mt-1">
+          {documentTypes[uploadedDoc.type]}: {' '}
+          <a 
+            href={uploadedDoc.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300"
+          >
+            {uploadedDoc.originalName}
+          </a>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-gray-800 shadow-3xl rounded-lg p-4 mb-4">
-      <div className="flex justify-between items-start mb-3">
-        <h4 className="text-lg font-medium text-white">{application.applicationName}</h4>
-        <span className={`${statusColor} text-white text-xs px-2 py-1 rounded-full`}>
-          {application.status}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+    <div className="bg-gray-800 rounded-lg p-6 mb-4">
+      <div className="flex justify-between items-start mb-4">
         <div>
-          <div className="text-gray-400 text-sm">External Key</div>
-          <div className="text-white">{application.externalKey}</div>
-        </div>
-        <div>
-          <div className="text-gray-400 text-sm">Plan ID</div>
-          <div className="text-white">{application.plan?.planId}</div>
-        </div>
-        <div>
-          <div className="text-gray-400 text-sm">Email</div>
-          <div className="text-white">{application.email || 'Not provided'}</div>
-        </div>
-        <div>
-          <div className="text-gray-400 text-sm">Created</div>
-          <div className="text-white">
-            {new Date(application.createdAt).toLocaleDateString()}
+          <h3 className="text-xl font-semibold text-gray-200">
+            {application.applicationName || 'Unnamed Application'}
+          </h3>
+          <p className="text-gray-400">Key: {application.externalKey}</p>
+          <p className="text-gray-400">Status: {application.status}</p>
+          <div className="mt-4">
+            <div className="mb-2">{getBankDocumentStatus()}</div>
           </div>
         </div>
-        <div>
-          <div className="text-gray-400 text-sm">Last Updated</div>
-          <div className="text-white">
-            {new Date(application.updatedAt).toLocaleDateString()}
-          </div>
-        </div>
-        {application.submittedAt && (
-          <div>
-            <div className="text-gray-400 text-sm">Submitted</div>
-            <div className="text-white">
-              {new Date(application.submittedAt).toLocaleDateString()}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {application.emailHistory?.length > 0 && (
-        <div className="bg-gray-900 p-3 rounded-md mb-4">
-          <div className="text-gray-400 text-sm mb-2">📧 Email History</div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            {application.emailHistory.slice(-3).map((email, idx) => (
-              <div key={idx} className="text-gray-300 text-xs">
-                {new Date(email.sentAt).toLocaleDateString()} - {email.type} {email.success ? '✅' : '❌'}
-              </div>
-            ))}
-            {application.emailHistory.length > 3 && (
-              <div className="text-gray-500 text-xs">
-                +{application.emailHistory.length - 3} more
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onView(application.externalKey)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-        >
-          View Details
-        </button>
-        {(application.status === APPLICATION_STATUSES.PENDING || 
-          application.status === APPLICATION_STATUSES.VALIDATED) && (
+        <div className="space-x-2">
+          <button
+            onClick={() => onView(application.externalKey)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            View
+          </button>
+          <button
+            onClick={() => onGenerateLink(application.externalKey)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            Generate Link
+          </button>
           <button
             onClick={() => onSubmit(application.externalKey)}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+            disabled={application.status === 'submitted_to_underwriting' || !application.documents?.some(doc => 
+              ['voided_check', 'bank_statement', 'processing_statement'].includes(doc.type)
+            )}
+            title={!application.documents?.some(doc => 
+              ['voided_check', 'bank_statement', 'processing_statement'].includes(doc.type)
+            ) ? 'Bank verification document required before submission' : ''}
           >
-            🚀 Submit
+            Submit
           </button>
-        )}
-        <button
-          onClick={() => onDelete(application.externalKey)}
-          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-        >
-          Delete
-        </button>
+          <button
+            onClick={() => onDelete(application.externalKey)}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   );

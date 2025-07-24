@@ -38,7 +38,7 @@ export const createApplication = async (applicationData) => {
 
 export const generateMerchantLink = async (externalKey) => {
   try {
-    const response = await api.post('/applications/merchant-links', { externalKey });
+    const response = await api.put('/applications/merchant-links', { externalKey });
     return response.data;
   } catch (error) {
     throw error.response?.data?.message || 'Failed to generate merchant link';
@@ -116,6 +116,36 @@ export const updateApplication = async (externalKey, formData) => {
     return response.data;
   } catch (error) {
     throw error.response?.data?.message || 'Failed to update application';
+  }
+};
+
+export const uploadDocument = async (externalKey, file, type) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+
+    const response = await api.post(
+      `/applications/${externalKey}/documents`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Failed to upload document';
+  }
+};
+
+export const deleteDocument = async (externalKey, documentId) => {
+  try {
+    const response = await api.delete(`/applications/${externalKey}/documents/${documentId}`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Failed to delete document';
   }
 };
 

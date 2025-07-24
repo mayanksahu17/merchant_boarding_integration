@@ -1,5 +1,26 @@
 const mongoose = require('mongoose');
 
+const documentSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    required: true,
+    enum: ['voided_check', 'bank_statement', 'processing_statement']
+  },
+  url: {
+    type: String,
+    required: true
+  },
+  key: {
+    type: String,
+    required: true
+  },
+  originalName: String,
+  uploadedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const principalSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -121,6 +142,8 @@ const applicationSchema = new mongoose.Schema({
   principals: [principalSchema],
   business: businessSchema,
   bankAccount: bankAccountSchema,
+  documents: [documentSchema],
+  merchantLink: String,  // Add merchantLink field
   status: { type: String, default: 'draft' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -128,7 +151,32 @@ const applicationSchema = new mongoose.Schema({
 
 applicationSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
+
+  // Only validate if status is being changed to 'submitted_to_underwriting'
+  if (this.isModified('status') && this.status === 'submitted_to_underwriting') {
+    const hasBankDocument = this.documents.some(doc => 
+      ['voided_check', 'bank_statement', 'processing_statement'].includes(doc.type)
+    );
+
+    if (!hasBankDocument) {
+      next(new Error('At least one bank verification document (voided check, bank statement, or processing statement) is required'));
+      return;
+    }
+  }
+
   next();
 });
+
+applicationSchema.methods.validateBankDocuments = function() {
+  const hasBankDocument = this.documents.some(doc => 
+    ['voided_check', 'bank_statement', 'processing_statement'].includes(doc.type)
+  );
+
+  if (!hasBankDocument) {
+    throw new Error('At least one bank verification document (voided check, bank statement, or processing statement) is required');
+  }
+
+  return true;
+};
 
 module.exports = mongoose.model('Application', applicationSchema);

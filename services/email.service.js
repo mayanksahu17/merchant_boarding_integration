@@ -5,7 +5,7 @@ sgMail.setApiKey(sendgridApiKey);
 
 async function sendMerchantLink(email, externalKey, baseUrl) {
   console.log(`Sending merchant link email to ${email} for externalKey: ${externalKey}`);
-  const merchantUrl = `${baseUrl}/merchant-form.html?key=${encodeURIComponent(externalKey)}`;
+  const merchantUrl = `${baseUrl}/merchant-form?key=${encodeURIComponent(externalKey)}`;
   const msg = {
     to: email,
     from: fromEmail,

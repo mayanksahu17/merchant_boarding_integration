@@ -1,14 +1,13 @@
 const axios = require('axios');
 const { handleApiError } = require('../utils/errorHandler');
 const applicationService = require('../services/application.service');
-const emailService = require('../services/email.service');
+const mailerService = require('../services/mailer.service');
 
 exports.createApplication = async (req, res) => {
   try {
-    // First save to MongoDB with all data including email
     const savedApplication = await applicationService.createApplication(req.body);
-    
-    // Then send to PaymentsHub API
+
+    // Call PaymentsHub API
     const response = await axios.post(
       "https://enrollment-api-sandbox.paymentshub.com/enroll/application",
       req.body,
@@ -19,7 +18,14 @@ exports.createApplication = async (req, res) => {
         },
       }
     );
-    
+
+    // Send email automatically
+    await mailerService.sendMerchantDetails(
+      req.body.email,
+      req.body.externalKey,
+      req.body.business?.corporateName || req.body.applicationName
+    );
+
     res.json({
       mongoApplication: savedApplication,
       paymentsHubResponse: response.data
@@ -187,24 +193,82 @@ exports.sendMerchantLinkEmail = async (req, res) => {
   try {
     const { email, externalKey } = req.body;
     
+    // Input validation
+    if (!email || !externalKey) {
+      return res.status(400).json({
+        message: 'Missing required fields',
+        details: {
+          email: !email ? 'Email is required' : null,
+          externalKey: !externalKey ? 'External key is required' : null
+        }
+      });
+    }
+    
     // Get application to verify it exists
     const application = await applicationService.getApplicationByExternalKey(externalKey);
     if (!application) {
-      return res.status(404).json({ message: 'Application not found' });
+      return res.status(404).json({
+        message: 'Application not found',
+        details: { externalKey }
+      });
     }
     
     // Generate or get existing link
     const link = application.merchantLink || 
       (await applicationService.generateMerchantLink(externalKey)).link;
     
-    // Send email
-    await emailService.sendMerchantLink(email, externalKey, process.env.FRONTEND_URL);
-    
-    // Update application status
-    await applicationService.changeApplicationStatus(externalKey, 'email_sent');
-    res.status(200).json({ message: 'Merchant link email sent successfully' });
+    try {
+      // Send email using mailer service
+      const emailResult = await mailerService.sendMerchantDetails(
+        email, 
+        externalKey, 
+        application.business?.corporateName || application.applicationName || 'Your Business'
+      );
+      
+      // Update application status only if email was sent successfully
+      await applicationService.changeApplicationStatus(externalKey, 'email_sent');
+      
+      return res.status(200).json({ 
+        message: 'Merchant link email sent successfully',
+        link,
+        details: emailResult
+      });
+    } catch (emailError) {
+      // Handle specific mailer errors
+      if (emailError.name === 'MailerError') {
+        return res.status(emailError.status || 500).json({
+          message: emailError.message,
+          details: emailError.details
+        });
+      }
+      
+      // Handle unexpected errors
+      console.error('Email sending failed:', emailError);
+      return res.status(500).json({ 
+        message: 'Failed to send merchant link email',
+        details: {
+          error: emailError.message,
+          email,
+          externalKey
+        }
+      });
+    }
   } catch (error) {
-    handleApiError(res, error);
+    // Handle application-level errors
+    console.error('Application processing failed:', error);
+    if (error.name === 'MailerError') {
+      return res.status(error.status || 500).json({
+        message: error.message,
+        details: error.details
+      });
+    }
+    
+    return res.status(500).json({ 
+      message: 'Failed to process merchant link email request',
+      details: {
+        error: error.message
+      }
+    });
   }
 };
 

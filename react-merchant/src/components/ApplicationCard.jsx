@@ -31,7 +31,7 @@ const ApplicationCard = ({ application, onDelete, onSubmit, onView }) => {
         </div>
         <div>
           <div className="text-gray-400 text-sm">Email</div>
-          <div className="text-white">{application.email || 'Not provided'}</div>
+          <div className="text-white">{application.applicationEmail || 'Not provided'}</div>
         </div>
         <div>
           <div className="text-gray-400 text-sm">Created</div>

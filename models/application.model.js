@@ -113,6 +113,7 @@ const bankAccountSchema = new mongoose.Schema({
 });
 
 const applicationSchema = new mongoose.Schema({
+  applicationEmail: { type: String, required: true },
   agent: Number,
   applicationName: String,
   externalKey: { type: String, unique: true },

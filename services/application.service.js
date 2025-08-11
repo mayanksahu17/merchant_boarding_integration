@@ -3,6 +3,7 @@ const Application = require('../models/application.model');
 const createApplication = async (applicationData) => {
   const application = new Application({
     ...applicationData,
+    applicationEmail: applicationData.email,
     status: 'pending',
     createdAt: new Date(),
     updatedAt: new Date()

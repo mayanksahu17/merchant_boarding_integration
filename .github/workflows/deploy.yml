@@ -3,7 +3,7 @@ name: 🚀 Deploy to AWS EC2
 on:
   push:
     branches:
-      - main
+      - release(1.0.0)
 
 jobs:
   deploy:
@@ -23,21 +23,34 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             echo "✅ Connected to EC2"
-            cd ~/crm-server
 
+            # --- Backend ---
+            cd ~/merchant_boarding_integration
             echo "🔁 Pulling latest code..."
-            git pull origin main
+            git fetch --all --prune
+            git reset --hard origin/main
 
-            echo "📦 Installing dependencies..."
-            npm ci
-
-            echo "♻️ Restarting server with PM2..."
-            if pm2 list | grep -q crm-server; then
-              pm2 restart crm-server
+            echo "♻️ Restarting backend with PM2..."
+            if pm2 list | grep -q merchant-api; then
+              pm2 restart merchant-api
             else
-              pm2 start server.js --name crm-server
+              pm2 start index.js --name merchant-api
+            fi
+
+            # --- Frontend ---
+            cd ~/merchant_boarding_integration/react-merchant
+            echo "📦 Installing frontend dependencies..."
+            npm install --legacy-peer-deps
+
+            echo "🏗️ Building frontend..."
+            npm run build
+
+            echo "♻️ Restarting frontend with PM2..."
+            if pm2 list | grep -q react-merchant; then
+              pm2 restart react-merchant
+            else
+              pm2 start "npm run start" --name react-merchant --cwd ~/merchant_boarding_integration/react-merchant
             fi
 
             echo "💾 Saving PM2 process list..."
             pm2 save
-

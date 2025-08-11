@@ -28,7 +28,7 @@ jobs:
             cd ~/merchant_boarding_integration
             echo "🔁 Pulling latest code..."
             git fetch --all --prune
-            git reset --hard origin/main
+            git reset --hard origin/release(1.0.0)
 
             echo "♻️ Restarting backend with PM2..."
             if pm2 list | grep -q merchant-api; then

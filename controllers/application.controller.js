@@ -31,7 +31,7 @@ exports.createApplication = async (req, res) => {
 
     // Call PaymentsHub API
     const response = await axios.post(
-      "https://api-auth.paymentshub.com/enroll/application",
+      `${process.env.API_ENDPOINT}/enroll/application`,
       req.body,
       {
         headers: {
@@ -68,7 +68,7 @@ exports.getApplication = async (req, res) => {
     
     // Then get from PaymentsHub API
     const response = await axios.get(
-      `https://api-auth.paymentshub.com/enroll/application/key/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/key/${externalKey}`,
       {
         headers: {
           Authorization: `Bearer ${req.accessToken}`,
@@ -96,7 +96,7 @@ exports.updateApplication = async (req, res) => {
     
     // Update in PaymentsHub API
     const response = await axios.patch(
-      `https://api-auth.paymentshub.com/enroll/application/key/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/key/${externalKey}`,
       req.body,
       {
         headers: {
@@ -123,7 +123,7 @@ exports.sendToMerchant = async (req, res) => {
     
     // Send to merchant in PaymentsHub API
     const response = await axios.put(
-      `https://api-auth.paymentshub.com/enroll/application/merchant/send/key/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/merchant/send/key/${externalKey}`,
       {},
       {
         headers: {
@@ -150,7 +150,7 @@ exports.validateApplication = async (req, res) => {
     
     // Validate in PaymentsHub API
     const response = await axios.get(
-      `https://api-auth.paymentshub.com/enroll/application/validate/${encodeURIComponent(externalKey)}`,
+      `${process.env.API_ENDPOINT}/enroll/application/validate/${encodeURIComponent(externalKey)}`,
       {
         headers: {
           Authorization: `Bearer ${req.accessToken}`,
@@ -176,7 +176,7 @@ exports.submitToUnderwriting = async (req, res) => {
     
     // Call PaymentsHub API
     const response = await axios.put(
-      `https://api-auth.paymentshub.com/enroll/application/submit/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/submit/${externalKey}`,
       {},
       {
         headers: {

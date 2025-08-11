@@ -1,4 +1,3 @@
-const API_BASE_URL = 'https://api.merchant.zifypay.com/api';
 
 export const API_ENDPOINTS = {
   LOGIN: `${API_BASE_URL}/admin/auth`,

@@ -18,7 +18,7 @@ const routes = require('./routes');
 app.use('/', routes);
 
 // Start server
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT;
 app.listen(PORT, async () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(process.env.CLIENT_SECRET, process.env.CLIENT_ID);

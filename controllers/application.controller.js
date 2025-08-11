@@ -1,4 +1,9 @@
 const axios = require('axios');
+
+axios.defaults.headers.common["n-partner-identity-origin"] =
+  "api-client-15m5ySJRcY4GTqe3oWzHlDCJ1I2SI9AZe+4lBIKpFW4jpVe92aNAPjKZe6gFZOMa";
+axios.defaults.headers.common["Content-Type"] = "application/json";
+
 const multer = require('multer');
 const { handleApiError } = require('../utils/errorHandler');
 const applicationService = require('../services/application.service');
@@ -26,7 +31,7 @@ exports.createApplication = async (req, res) => {
 
     // Call PaymentsHub API
     const response = await axios.post(
-      "https://enrollment-api-sandbox.paymentshub.com/enroll/application",
+      "https://boarding-api.paymentshub.com/enroll/application",
       req.body,
       {
         headers: {
@@ -63,7 +68,7 @@ exports.getApplication = async (req, res) => {
     
     // Then get from PaymentsHub API
     const response = await axios.get(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
       {
         headers: {
           Authorization: `Bearer ${req.accessToken}`,
@@ -91,7 +96,7 @@ exports.updateApplication = async (req, res) => {
     
     // Update in PaymentsHub API
     const response = await axios.patch(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
       req.body,
       {
         headers: {
@@ -118,7 +123,7 @@ exports.sendToMerchant = async (req, res) => {
     
     // Send to merchant in PaymentsHub API
     const response = await axios.put(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/merchant/send/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/merchant/send/key/${externalKey}`,
       {},
       {
         headers: {
@@ -145,7 +150,7 @@ exports.validateApplication = async (req, res) => {
     
     // Validate in PaymentsHub API
     const response = await axios.get(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/validate/${encodeURIComponent(externalKey)}`,
+      `https://boarding-api.paymentshub.com/enroll/application/validate/${encodeURIComponent(externalKey)}`,
       {
         headers: {
           Authorization: `Bearer ${req.accessToken}`,
@@ -171,7 +176,7 @@ exports.submitToUnderwriting = async (req, res) => {
     
     // Call PaymentsHub API
     const response = await axios.put(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/submit/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/submit/${externalKey}`,
       {},
       {
         headers: {

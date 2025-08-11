@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ApplicationCard from './ApplicationCard';
+import { downloadApplicationPDF } from '../services/api';
 
 const RecentApplications = ({ 
   applications, 
@@ -10,6 +11,7 @@ const RecentApplications = ({
   onGenerateLink
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -17,6 +19,18 @@ const RecentApplications = ({
       await onRefresh();
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleDownloadPDF = async (externalKey) => {
+    setDownloadingPDF(true);
+    try {
+      await downloadApplicationPDF(externalKey);
+    } catch (error) {
+      console.error('Failed to download PDF:', error);
+      // You might want to show an error message to the user here
+    } finally {
+      setDownloadingPDF(false);
     }
   };
 
@@ -49,6 +63,7 @@ const RecentApplications = ({
               onSubmit={onSubmit}
               onView={onView}
               onGenerateLink={onGenerateLink}
+              onDownloadPDF={handleDownloadPDF}
             />
           ))
         )}

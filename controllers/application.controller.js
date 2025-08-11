@@ -1,7 +1,24 @@
 const axios = require('axios');
+const multer = require('multer');
 const { handleApiError } = require('../utils/errorHandler');
 const applicationService = require('../services/application.service');
-const mailerService = require('../services/mailer.service');
+const s3Service = require('../services/s3.service');
+
+// Configure multer for memory storage
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only PDF, JPG, PNG, and DOC files are allowed.'));
+    }
+  }
+}).single('file');
 
 exports.createApplication = async (req, res) => {
   try {
@@ -19,12 +36,14 @@ exports.createApplication = async (req, res) => {
       }
     );
 
-    // Send email automatically
-    await mailerService.sendMerchantDetails(
-      req.body.email,
-      req.body.externalKey,
-      req.body.business?.corporateName || req.body.applicationName
-    );
+    // Only send email if sendEmail query param is true
+    if (req.query.sendEmail === 'true') {
+      await applicationService.sendMerchantLinkEmail(
+        req.body.applicationEmail,
+        req.body.externalKey,
+        req.body.business?.corporateName || req.body.applicationName
+      );
+    }
 
     res.json({
       mongoApplication: savedApplication,
@@ -147,10 +166,10 @@ exports.submitToUnderwriting = async (req, res) => {
   try {
     const { externalKey } = req.params;
     
-    // Update status in MongoDB
-    const updatedApplication = await applicationService.changeApplicationStatus(externalKey, 'submitted_to_underwriting');
+    // This will validate bank documents and update status
+    const updatedApplication = await applicationService.submitToUnderwriting(externalKey);
     
-    // Submit to underwriting in PaymentsHub API
+    // Call PaymentsHub API
     const response = await axios.put(
       `https://enrollment-api-sandbox.paymentshub.com/enroll/application/submit/${externalKey}`,
       {},
@@ -182,8 +201,35 @@ exports.getAllApplications = async (req, res) => {
 exports.generateMerchantLink = async (req, res) => {
   try {
     const { externalKey } = req.body;
-    const { link } = await applicationService.generateMerchantLink(externalKey);
-    res.json({ link });
+
+    if (!externalKey) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'External key is required'
+      });
+    }
+
+    // Get application to verify it exists
+    const application = await applicationService.getApplicationByExternalKey(externalKey);
+    if (!application) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Application not found'
+      });
+    }
+
+    // Generate the merchant link
+    const { link, applicationEmail } = await applicationService.generateMerchantLink(externalKey);
+
+    // Update application status
+    await applicationService.changeApplicationStatus(externalKey, 'link_generated');
+
+    res.json({
+      status: 'success',
+      message: 'Merchant link generated successfully',
+      link,
+      applicationEmail
+    });
   } catch (error) {
     handleApiError(res, error);
   }
@@ -192,83 +238,162 @@ exports.generateMerchantLink = async (req, res) => {
 exports.sendMerchantLinkEmail = async (req, res) => {
   try {
     const { email, externalKey } = req.body;
-    
-    // Input validation
+
     if (!email || !externalKey) {
       return res.status(400).json({
-        message: 'Missing required fields',
-        details: {
-          email: !email ? 'Email is required' : null,
-          externalKey: !externalKey ? 'External key is required' : null
-        }
+        status: 'error',
+        message: 'Email and external key are required'
       });
     }
-    
+
     // Get application to verify it exists
     const application = await applicationService.getApplicationByExternalKey(externalKey);
     if (!application) {
       return res.status(404).json({
-        message: 'Application not found',
-        details: { externalKey }
+        status: 'error',
+        message: 'Application not found'
       });
     }
-    
-    // Generate or get existing link
-    const link = application.merchantLink || 
-      (await applicationService.generateMerchantLink(externalKey)).link;
-    
-    try {
-      // Send email using mailer service
-      const emailResult = await mailerService.sendMerchantDetails(
-        email, 
-        externalKey, 
-        application.business?.corporateName || application.applicationName || 'Your Business'
-      );
-      
-      // Update application status only if email was sent successfully
-      await applicationService.changeApplicationStatus(externalKey, 'email_sent');
-      
-      return res.status(200).json({ 
-        message: 'Merchant link email sent successfully',
-        link,
-        details: emailResult
-      });
-    } catch (emailError) {
-      // Handle specific mailer errors
-      if (emailError.name === 'MailerError') {
-        return res.status(emailError.status || 500).json({
-          message: emailError.message,
-          details: emailError.details
+
+    // Generate link if not already generated
+    const { link } = await applicationService.generateMerchantLink(externalKey);
+
+    // Send email
+    await applicationService.sendMerchantLinkEmail(email, externalKey, application.applicationName);
+
+    res.json({
+      status: 'success',
+      message: 'Merchant link email sent successfully',
+      link
+    });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+};
+
+exports.getDocumentTypes = async (req, res) => {
+  try {
+    const response = await applicationService.getDocumentTypes(req.accessToken);
+    res.json(response);
+  } catch (error) {
+    console.error('Error in getDocumentTypes controller:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to fetch document types'
+    });
+  }
+};
+
+exports.uploadDocument = async (req, res) => {
+  try {
+    upload(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          status: 'error',
+          message: err.message
         });
       }
-      
-      // Handle unexpected errors
-      console.error('Email sending failed:', emailError);
-      return res.status(500).json({ 
-        message: 'Failed to send merchant link email',
-        details: {
-          error: emailError.message,
-          email,
-          externalKey
+
+      const { externalKey } = req.params;
+      const { type } = req.body;
+      let s3Url = null;
+
+      if (!req.file) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'No file uploaded'
+        });
+      }
+
+      try {
+        // Generate unique key for S3
+        const key = `applications/${externalKey}/documents/${Date.now()}-${req.file.originalname}`;
+        
+        // Upload to S3
+        s3Url = await s3Service.uploadFile(req.file, key);
+
+        // Convert file to base64 for PaymentsHub
+        const base64File = req.file.buffer.toString('base64');
+
+        // Upload to PaymentsHub
+        const paymentsHubResponse = await applicationService.uploadDocumentToPaymentsHub(
+          externalKey,
+          {
+            fileName: req.file.originalname,
+            fileType: type,
+            attachment: base64File
+          },
+          req.accessToken
+        );
+
+        // Save document info to MongoDB
+        const updatedApplication = await applicationService.addDocument(externalKey, {
+          type,
+          url: s3Url,
+          key,
+          originalName: req.file.originalname
+        });
+
+        res.json({
+          status: 'success',
+          message: 'Document uploaded successfully',
+          document: updatedApplication.documents[updatedApplication.documents.length - 1],
+          paymentsHubResponse
+        });
+      } catch (error) {
+        // If any error occurs and we've uploaded to S3, try to delete the file
+        if (s3Url) {
+          try {
+            await s3Service.deleteFile(key);
+          } catch (s3Error) {
+            console.error('Failed to delete S3 file after error:', s3Error);
+          }
         }
-      });
-    }
-  } catch (error) {
-    // Handle application-level errors
-    console.error('Application processing failed:', error);
-    if (error.name === 'MailerError') {
-      return res.status(error.status || 500).json({
-        message: error.message,
-        details: error.details
-      });
-    }
-    
-    return res.status(500).json({ 
-      message: 'Failed to process merchant link email request',
-      details: {
-        error: error.message
+
+        // Send error response
+        res.status(500).json({
+          status: 'error',
+          message: error.message || 'Failed to upload document'
+        });
       }
     });
+  } catch (error) {
+    handleApiError(res, error);
+  }
+};
+
+exports.deleteDocument = async (req, res) => {
+  try {
+    const { externalKey, documentId } = req.params;
+
+    // Get document info before deletion
+    const application = await applicationService.getApplicationByExternalKey(externalKey);
+    if (!application) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Application not found'
+      });
+    }
+
+    const document = application.documents.id(documentId);
+    if (!document) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Document not found'
+      });
+    }
+
+    // Only remove document from MongoDB
+    const updatedApplication = await applicationService.removeDocument(externalKey, documentId);
+
+    res.json({
+      status: 'success',
+      message: 'Document deleted successfully from database',
+      application: updatedApplication
+    });
+  } catch (error) {
+    console.error('Error deleting document:', error);
+    handleApiError(res, error);
   }
 };
 
@@ -286,5 +411,28 @@ exports.deleteApplication = async (req, res) => {
     res.json({ message: 'Application deleted successfully' });
   } catch (error) {
     handleApiError(res, error);
+  }
+};
+
+exports.getApplicationPDF = async (req, res) => {
+  try {
+    const { externalKey } = req.params;
+    const pdfBuffer = await applicationService.getApplicationPDF(externalKey, req.accessToken);
+    
+    // Set response headers for PDF download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=application-${externalKey}.pdf`);
+    
+    // Send the PDF buffer
+    res.send(pdfBuffer);
+  } catch (error) {
+    if (error.message === 'Application PDF not found') {
+      res.status(404).json({
+        status: 'error',
+        message: 'Application PDF not found'
+      });
+    } else {
+      handleApiError(res, error);
+    }
   }
 };

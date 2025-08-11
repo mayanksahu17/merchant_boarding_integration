@@ -1,100 +1,59 @@
-import { APPLICATION_STATUSES } from '../constants';
+import React from 'react';
 
-const ApplicationCard = ({ application, onDelete, onSubmit, onView }) => {
-  const statusColor = {
-    [APPLICATION_STATUSES.PENDING]: 'bg-yellow-500',
-    [APPLICATION_STATUSES.SUBMITTED]: 'bg-blue-500',
-    [APPLICATION_STATUSES.VALIDATED]: 'bg-green-500',
-    [APPLICATION_STATUSES.ERROR]: 'bg-red-500',
-    [APPLICATION_STATUSES.UNDERWRITING]: 'bg-purple-500',
-    [APPLICATION_STATUSES.APPROVED]: 'bg-green-600',
-    [APPLICATION_STATUSES.REJECTED]: 'bg-red-600',
-  }[application.status] || 'bg-gray-500';
-
+const ApplicationCard = ({ 
+  application, 
+  onDelete, 
+  onSubmit, 
+  onView, 
+  onGenerateLink,
+  onDownloadPDF 
+}) => {
   return (
-    <div className="bg-gray-800 shadow-3xl rounded-lg p-4 mb-4">
-      <div className="flex justify-between items-start mb-3">
-        <h4 className="text-lg font-medium text-white">{application.applicationName}</h4>
-        <span className={`${statusColor} text-white text-xs px-2 py-1 rounded-full`}>
-          {application.status}
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+    <div className="bg-gray-700 rounded-lg p-4">
+      <div className="flex justify-between items-start mb-4">
         <div>
-          <div className="text-gray-400 text-sm">External Key</div>
-          <div className="text-white">{application.externalKey}</div>
+          <h4 className="text-lg font-semibold text-white">{application.applicationName || 'Unnamed Application'}</h4>
+          <p className="text-gray-400 text-sm">Key: {application.externalKey}</p>
+          <p className="text-gray-400 text-sm">Status: {application.status}</p>
+          <p className="text-gray-400 text-sm">Created: {new Date(application.createdAt).toLocaleDateString()}</p>
         </div>
-        <div>
-          <div className="text-gray-400 text-sm">Plan ID</div>
-          <div className="text-white">{application.plan?.planId}</div>
-        </div>
-        <div>
-          <div className="text-gray-400 text-sm">Email</div>
-          <div className="text-white">{application.applicationEmail || 'Not provided'}</div>
-        </div>
-        <div>
-          <div className="text-gray-400 text-sm">Created</div>
-          <div className="text-white">
-            {new Date(application.createdAt).toLocaleDateString()}
-          </div>
-        </div>
-        <div>
-          <div className="text-gray-400 text-sm">Last Updated</div>
-          <div className="text-white">
-            {new Date(application.updatedAt).toLocaleDateString()}
-          </div>
-        </div>
-        {application.submittedAt && (
-          <div>
-            <div className="text-gray-400 text-sm">Submitted</div>
-            <div className="text-white">
-              {new Date(application.submittedAt).toLocaleDateString()}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {application.emailHistory?.length > 0 && (
-        <div className="bg-gray-900 p-3 rounded-md mb-4">
-          <div className="text-gray-400 text-sm mb-2">📧 Email History</div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            {application.emailHistory.slice(-3).map((email, idx) => (
-              <div key={idx} className="text-gray-300 text-xs">
-                {new Date(email.sentAt).toLocaleDateString()} - {email.type} {email.success ? '✅' : '❌'}
-              </div>
-            ))}
-            {application.emailHistory.length > 3 && (
-              <div className="text-gray-500 text-xs">
-                +{application.emailHistory.length - 3} more
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => onView(application.externalKey)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-        >
-          View Details
-        </button>
-        {(application.status === APPLICATION_STATUSES.PENDING || 
-          application.status === APPLICATION_STATUSES.VALIDATED) && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => onView(application.externalKey)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+            title="View Application"
+          >
+            👁️ View
+          </button>
+          <button
+            onClick={() => onGenerateLink(application.externalKey)}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+            title="Generate Link"
+          >
+            🔗 Link
+          </button>
+          <button
+            onClick={() => onDownloadPDF(application.externalKey)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm"
+            title="Download PDF"
+          >
+            📄 PDF
+          </button>
           <button
             onClick={() => onSubmit(application.externalKey)}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm"
+            title="Submit to Underwriting"
           >
-            🚀 Submit
+            📤 Submit
           </button>
-        )}
-        <button
-          onClick={() => onDelete(application.externalKey)}
-          className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
-        >
-          Delete
-        </button>
+          <button
+            onClick={() => onDelete(application.externalKey)}
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+            title="Delete Application"
+          >
+            🗑️ Delete
+          </button>
+        </div>
       </div>
     </div>
   );

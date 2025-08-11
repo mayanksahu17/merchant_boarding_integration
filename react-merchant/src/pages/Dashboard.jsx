@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState({ message: '', type: '' });
   const [merchantLink, setMerchantLink] = useState('');
+  const [applicationEmail, setApplicationEmail] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -63,7 +64,6 @@ const Dashboard = () => {
         email: formData.email,
         plan: {
           planId: parseInt(formData.planId),
-        // },
           equipmentCostToMerchant: 325.49,
           accountSetupFee: 12.95,
           discountFrequency: "Daily",
@@ -188,17 +188,18 @@ const Dashboard = () => {
         }
       });
 
-      // Add to local state
-      setApplications(prev => [newApp, ...prev]);
+      // Refresh the applications list
+      await loadApplications();
 
-      // Show success message
+      // Update states
+      setExternalKey(formData.externalKey);
+      setApplicationEmail(formData.email);
+      setMerchantLink(''); // Clear merchant link
       setStatus({ message: 'Application created successfully!', type: 'success' });
 
-      // Generate new external key
-      setExternalKey("EXT" + Math.floor(Math.random() * 1e14));
-
-      // Clear merchant link if any
-      setMerchantLink('');
+      // Generate new external key for next application
+      const newKey = "EXT" + Math.floor(Math.random() * 1e14);
+      setExternalKey(newKey);
     } catch (error) {
       setStatus({ message: error.message || 'Failed to create application', type: 'error' });
     } finally {
@@ -209,10 +210,12 @@ const Dashboard = () => {
   const handleGenerateMerchantLink = async (externalKey) => {
     setIsLoading(true);
     try {
-      const { link } = await generateMerchantLink(externalKey);
+      const { link, applicationEmail } = await generateMerchantLink(externalKey);
       setMerchantLink(link);
+      setApplicationEmail(applicationEmail);
+      setExternalKey(externalKey); // Update the selected external key
       setStatus({ message: 'Merchant link generated!', type: 'success' });
-      return link;
+      return { link, applicationEmail };
     } catch (error) {
       setStatus({ message: error.message || 'Failed to generate link', type: 'error' });
       return null;
@@ -225,6 +228,8 @@ const Dashboard = () => {
     setIsLoading(true);
     try {
       await sendMerchantLinkEmail(email, externalKey);
+      setApplicationEmail(email); // Update the email state
+      setExternalKey(externalKey); // Update the selected external key
       setStatus({ message: 'Merchant link sent successfully!', type: 'success' });
     } catch (error) {
       setStatus({ message: error.message || 'Failed to send email', type: 'error' });
@@ -315,9 +320,13 @@ const Dashboard = () => {
           <GenerateLinkSection
             applications={applications}
             merchantLink={merchantLink}
+            applicationEmail={applicationEmail}
+            externalKey={externalKey}
             onGenerateLink={handleGenerateMerchantLink}
             onSendEmail={handleSendMerchantLinkEmail}
             onCopyLink={() => handleCopyToClipboard(merchantLink)}
+            setMerchantLink={setMerchantLink}
+            setStatus={setStatus}
           />
         </div>
 

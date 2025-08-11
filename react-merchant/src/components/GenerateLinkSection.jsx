@@ -1,24 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const GenerateLinkSection = ({ 
   applications, 
   merchantLink,
+  applicationEmail,
+  externalKey,
   onGenerateLink, 
   onSendEmail,
-  onCopyLink
+  onCopyLink,
+  setMerchantLink,
+  setStatus
 }) => {
-  const [externalKey, setExternalKey] = useState('');
-  const [email, setEmail] = useState('');
+  const [selectedKey, setSelectedKey] = useState(externalKey || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Update selectedKey when externalKey prop changes
+  useEffect(() => {
+    if (externalKey) {
+      setSelectedKey(externalKey);
+    }
+  }, [externalKey]);
 
   const handleGenerateLink = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      await onGenerateLink(externalKey);
+      const { link } = await onGenerateLink(selectedKey);
+      setMerchantLink(link);
+      setStatus({ message: 'Merchant link generated!', type: 'success' });
+      return link;
     } catch (err) {
       setError(err.message || 'Failed to generate link');
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -28,7 +42,8 @@ const GenerateLinkSection = ({
     setIsLoading(true);
     setError(null);
     try {
-      await onSendEmail(email, externalKey);
+      await onSendEmail(applicationEmail, selectedKey);
+      setStatus({ message: 'Email sent successfully!', type: 'success' });
     } catch (err) {
       setError(err.message || 'Failed to send email');
     } finally {
@@ -37,10 +52,11 @@ const GenerateLinkSection = ({
   };
 
   const handleApplicationSelect = (key) => {
-    setExternalKey(key);
+    setSelectedKey(key);
     const app = applications.find(app => app.externalKey === key);
-    if (app && app.email) {
-      setEmail(app.email);
+    if (app && app.applicationEmail) {
+      // Let parent component handle email state
+      onSendEmail(app.applicationEmail, key);
     }
   };
 
@@ -55,14 +71,14 @@ const GenerateLinkSection = ({
           <input
             type="text"
             id="linkExternalKey"
-            value={externalKey}
-            onChange={(e) => setExternalKey(e.target.value)}
+            value={selectedKey}
+            onChange={(e) => setSelectedKey(e.target.value)}
             placeholder="Enter external key"
             className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
           />
           <button
             onClick={handleGenerateLink}
-            disabled={!externalKey || isLoading}
+            disabled={!selectedKey || isLoading}
             className={`bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded ${isLoading ? 'btn-loading' : ''}`}
           >
             {isLoading ? 'Generating...' : 'Generate Link'}
@@ -104,14 +120,13 @@ const GenerateLinkSection = ({
               <input
                 type="email"
                 id="linkEmailAddress"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter email address"
+                value={applicationEmail || ''}           
+                placeholder="Email will be auto-filled"
                 className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white"
               />
               <button
                 onClick={handleSendEmail}
-                disabled={!email || isLoading}
+                disabled={!applicationEmail || isLoading}
                 className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded ${isLoading ? 'btn-loading' : ''}`}
               >
                 {isLoading ? 'Sending...' : '📧 Send'}

@@ -232,7 +232,7 @@ const getApplicationPDF = async (externalKey, accessToken) => {
 const getDocumentTypes = async (accessToken) => {
   try {
     const response = await axios.get(
-      'https://enrollment-api-sandbox.paymentshub.com/enroll/document/type/list',
+      `${process.env.API_ENDPOINT}/enroll/document/type/list`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,

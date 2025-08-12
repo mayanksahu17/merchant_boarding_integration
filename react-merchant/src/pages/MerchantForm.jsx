@@ -1608,7 +1608,7 @@ const MerchantForm = () => {
                           id="bankAccount.abaRouting"
                           name="bankAccount.abaRouting"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.bankAccount.abaRouting}
+                          value={formData.bankAccount?.abaRouting}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1624,7 +1624,7 @@ const MerchantForm = () => {
                           id="bankAccount.accountType"
                           name="bankAccount.accountType"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.bankAccount.accountType}
+                          value={formData.bankAccount?.accountType}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1640,7 +1640,7 @@ const MerchantForm = () => {
                           id="bankAccount.demandDepositAccount"
                           name="bankAccount.demandDepositAccount"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.bankAccount.demandDepositAccount}
+                          value={formData.bankAccount?.demandDepositAccount}
                           onChange={handleInputChange}
                         />
                       </div>

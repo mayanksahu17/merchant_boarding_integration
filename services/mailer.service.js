@@ -2,7 +2,7 @@ const nodemailer = require("nodemailer");
 const config = require("../config/mailer.config");
 
 // transporter (unchanged)
-const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransporter({
   service: config.service || "gmail",
   auth: { user: config.email, pass: config.password },
 });
@@ -62,7 +62,12 @@ function buildEmailHTML({
               <table role="presentation" width="100%">
                 <tr>
                   <td align="left">
-                    <img src="${logoUrl}" alt="ZifyPay" width="160" style="display:block; width:160px; height:auto;"/>
+                    <!-- Logo with blue background box -->
+                    <div style="display:inline-block; background:${
+                      brand.primary
+                    }; padding:12px 16px; border-radius:8px; box-shadow:0 2px 4px rgba(37, 99, 235, 0.1);">
+                      <img src="${logoUrl}" alt="ZifyPay" width="160" style="display:block; width:160px; height:auto; filter:brightness(0) invert(1);"/>
+                    </div>
                   </td>
                   <td align="right" style="font:500 14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; color:${
                     brand.muted
@@ -137,7 +142,7 @@ function buildEmailHTML({
               <p style="margin:0 0 8px; font:500 13px/1.5 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; color:${
                 brand.muted
               };">
-                If the button doesn’t work, copy this link:
+                If the button doesn't work, copy this link:
               </p>
               <p style="margin:0; font:400 13px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; color:${
                 brand.primary
@@ -180,7 +185,7 @@ function buildEmailHTML({
                 © ${new Date().getFullYear()} ZifyPay. All rights reserved.
               </p>
               <p style="margin:6px 0 0; font:400 11px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif; color:#9CA3AF;">
-                You’re receiving this because an application was initiated for your business on ZifyPay. If this wasn’t you, please ignore this email.
+                You're receiving this because an application was initiated for your business on ZifyPay. If this wasn't you, please ignore this email.
               </p>
             </td>
           </tr>

@@ -59,18 +59,17 @@ const generateMerchantLink = async (externalKey) => {
     throw new Error('Application not found');
   }
 
+  const link = `http://merchant.zifypay.com/merchant-form?key=${encodeURIComponent(externalKey)}`;
   // If link already exists, return it
   if (application.merchantLink) {
     return { 
-      link: application.merchantLink,
+      link: link,
       applicationEmail: application.applicationEmail 
     };
   }
   
   // Generate a new link
-  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const link = `${baseUrl}/merchant-form?key=${encodeURIComponent(externalKey)}`;
-  
+
   // Save the link to the application
   application.merchantLink = link;
   await application.save();

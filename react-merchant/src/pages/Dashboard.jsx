@@ -13,6 +13,7 @@ import GenerateLinkSection from '../components/GenerateLinkSection';
 import RecentApplications from '../components/RecentApplications';
 import LoadingOverlay from '../components/LoadingOverlay';
 import StatusDisplay from '../components/StatusDisplay';
+import Guide from '../components/guide'
 
 const Dashboard = () => {
   const [applications, setApplications] = useState([]);
@@ -179,14 +180,41 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
+    <div className="min-h-screen bg-gray-900 text-white p-4 md:">
       <div className="max-w-11/12 mx-auto">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold">Merchant Onboarding Dashboard</h1>
-          <p className="text-gray-400">Create applications and track their status</p>
+        <header className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Left side: Logo + Title */}
+          <div>
+            <img
+              src="https://zifypay.com/logo.png"
+              alt="logo"
+              className="h-12 w-52 object-contain"
+            />
+             {/* <h1 className="text-2xl font-bold mt-2 sm:mt-3">
+              Merchant Onboarding Dashboard
+            </h1> */}
+            <p className="text-gray-400">
+              Create applications and track their status
+            </p> 
+          </div>
+
+          {/* Right side: Guide Button */}
+          {/* <div>
+            <button
+              onClick={() => window.open("/guide.pdf", "_blank")} // Change link as needed
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md transition"
+            >
+              📘 Guide
+            </button>
+          </div> */}
+          <Guide />
         </header>
 
-        <StatusDisplay message={status.message} type={status.type} onClose={() => setStatus({ message: '', type: '' })} />
+        <StatusDisplay
+          message={status.message}
+          type={status.type}
+          onClose={() => setStatus({ message: "", type: "" })}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <CreateApplicationForm

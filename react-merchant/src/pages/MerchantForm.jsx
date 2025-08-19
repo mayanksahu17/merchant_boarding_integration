@@ -108,53 +108,65 @@ const MerchantForm = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value, type } = e.target;
-    const processedValue = type === 'date' ? value : value;
+  const { name, value, type } = e.target;
+  let processedValue = value;
 
-    if (name.includes('.')) {
-      const keys = name.split('.');
-      setFormData((prev) => {
-        const newState = { ...prev };
-        let current = newState;
-        for (let i = 0; i < keys.length - 1; i++) {
-          const arrayMatch = keys[i].match(/(\w+)\[(\d+)\]/);
-          if (arrayMatch) {
-            const arrayName = arrayMatch[1];
-            const arrayIndex = parseInt(arrayMatch[2]);
-            if (!current[arrayName] || !Array.isArray(current[arrayName])) {
-              current[arrayName] = [];
-            }
-            if (!current[arrayName][arrayIndex]) {
-              current[arrayName][arrayIndex] = {};
-            }
-            current = current[arrayName][arrayIndex];
-          } else {
-            if (!current[keys[i]]) {
-              current[keys[i]] = {};
-            }
-            current = current[keys[i]];
-          }
-        }
-        const lastKeyArrayMatch = keys[keys.length - 1].match(/(\w+)\[(\d+)\]/);
-        if (lastKeyArrayMatch) {
-          const arrayName = lastKeyArrayMatch[1];
-          const arrayIndex = parseInt(lastKeyArrayMatch[2]);
+  // Convert to number if the field is numeric
+  if (type === 'number' || name.includes('plan.') || name.includes('equipment') || name.includes('percentOfBusinessTransactions') || name.includes('accountSetupFee') || name.includes('equipmentCostToMerchant')) {
+    processedValue = value === '' ? '' : Number(value);
+  }
+
+  // Handle date fields
+  if (type === 'date') {
+    processedValue = value;
+  }
+
+  // Handle nested fields (e.g., plan.equipment[0].quantity)
+  if (name.includes('.')) {
+    const keys = name.split('.');
+    setFormData((prev) => {
+      const newState = { ...prev };
+      let current = newState;
+      for (let i = 0; i < keys.length - 1; i++) {
+        const arrayMatch = keys[i].match(/(\w+)\[(\d+)\]/);
+        if (arrayMatch) {
+          const arrayName = arrayMatch[1];
+          const arrayIndex = parseInt(arrayMatch[2]);
           if (!current[arrayName] || !Array.isArray(current[arrayName])) {
             current[arrayName] = [];
           }
-          current[arrayName][arrayIndex] = processedValue;
+          if (!current[arrayName][arrayIndex]) {
+            current[arrayName][arrayIndex] = {};
+          }
+          current = current[arrayName][arrayIndex];
         } else {
-          current[keys[keys.length - 1]] = processedValue;
+          if (!current[keys[i]]) {
+            current[keys[i]] = {};
+          }
+          current = current[keys[i]];
         }
-        return newState;
-      });
-    } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: processedValue,
-      }));
-    }
-  };
+      }
+      const lastKeyArrayMatch = keys[keys.length - 1].match(/(\w+)\[(\d+)\]/);
+      if (lastKeyArrayMatch) {
+        const arrayName = lastKeyArrayMatch[1];
+        const arrayIndex = parseInt(lastKeyArrayMatch[2]);
+        if (!current[arrayName] || !Array.isArray(current[arrayName])) {
+          current[arrayName] = [];
+        }
+        current[arrayName][arrayIndex] = processedValue;
+      } else {
+        current[keys[keys.length - 1]] = processedValue;
+      }
+      return newState;
+    });
+  } else {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: processedValue,
+    }));
+  }
+};
+
 
   const loadApplicationData = async (externalKey) => {
     setIsLoading(true);

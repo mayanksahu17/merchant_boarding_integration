@@ -24,8 +24,8 @@ const MerchantForm = () => {
     externalKey: '',
     plan: {
       planId: '',
-      equipmentCostToMerchant: 325.49,
-      accountSetupFee: 12.95,
+      equipmentCostToMerchant: 0,
+      accountSetupFee: 0,
       discountFrequency: 'Daily',
       equipment: [{ equipmentId: 1155, quantity: 1 }],
     },
@@ -472,10 +472,35 @@ const MerchantForm = () => {
                         name="plan.accountSetupFee"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                         value={formData.plan.accountSetupFee}
-                        onChange={handleInputChange}
-                        step="0.01"
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only allow numbers and decimal points
+                          if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+                            handleInputChange(e);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Prevent non-numeric keys (except backspace, delete, tab, escape, enter, and decimal point)
+                          if (
+                            ![
+                              "Backspace",
+                              "Delete",
+                              "Tab",
+                              "Escape",
+                              "Enter",
+                              "ArrowLeft",
+                              "ArrowRight",
+                              "Decimal",
+                            ].includes(e.key) &&
+                            !/^[0-9]$/.test(e.key)
+                          ) {
+                            e.preventDefault();
+                          }
+                        }}
+                        step="0.05"
                       />
                     </div>
+
                     <div className="form-group">
                       <label
                         htmlFor="plan.discountFrequency"
@@ -1661,11 +1686,10 @@ const MerchantForm = () => {
               <button
                 onClick={prevStep}
                 disabled={currentStep === 1}
-                className={`px-6 py-3 rounded-md font-medium ${
-                  currentStep === 1
+                className={`px-6 py-3 rounded-md font-medium ${currentStep === 1
                     ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                  }`}
               >
                 ← Previous
               </button>

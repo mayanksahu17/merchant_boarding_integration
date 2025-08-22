@@ -374,19 +374,19 @@ const MerchantForm = () => {
         <div className="max-w-6xl mx-auto bg-gray-800 rounded-lg shadow-md overflow-hidden">
           <div className="p-6 sm:p-8">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-200">Merchant Application Form</h1>
-              <p className="text-gray-400 mt-2">Complete merchant and business details for processing</p>
+              <h1 className="text-3xl font-bold text-white">Merchant Application Form</h1>
+              <p className="text-white mt-2">Complete merchant and business details for processing</p>
             </div>
             <ProgressBar currentStep={currentStep} totalSteps={3} />
             <div className="mt-8 space-y-6">
               {currentStep === 1 && (
                 <div className="form-section active space-y-6">
-                  <div className="section-title text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">
+                  <div className="section-title text-2xl font-bold text-white dark:text-white mb-6">
                     General Information
                   </div>
                   <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="form-group">
-                      <label htmlFor="agent" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      <label htmlFor="agent" className="block text-sm font-medium text-white dark:text-white mb-1">
                         Agent <span className="required text-red-500">*</span>
                       </label>
                       <input
@@ -403,7 +403,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="applicationName"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Application Name <span className="required text-red-500">*</span>
                       </label>
@@ -420,7 +420,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="externalKey"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         External Key <span className="required text-red-500">*</span>
                       </label>
@@ -440,7 +440,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="plan.planId"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Plan ID <span className="required text-red-500">*</span>
                       </label>
@@ -457,7 +457,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="plan.equipmentCostToMerchant"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Equipment Cost
                       </label>
@@ -474,7 +474,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="plan.accountSetupFee"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Setup Fee
                       </label>
@@ -516,7 +516,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="plan.discountFrequency"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Discount Frequency
                       </label>
@@ -531,7 +531,7 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Equipment
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -540,7 +540,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor="plan.equipment[0].equipmentId"
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Equipment ID
                             </label>
@@ -556,7 +556,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor="plan.equipment[0].quantity"
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Quantity
                             </label>
@@ -577,7 +577,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="shipping?.shippingDestination"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Shipping Destination
                       </label>
@@ -593,7 +593,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="shipping?.deliveryMethod"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Delivery Method
                       </label>
@@ -611,14 +611,14 @@ const MerchantForm = () => {
               )}
               {currentStep === 2 && (
                 <div className="form-section space-y-6">
-                  <div className="section-title text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">
+                  <div className="section-title text-2xl font-bold text-white dark:text-white mb-6">
                     Business Information
                   </div>
                   <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="form-group">
                       <label
                         htmlFor="business?.corporateName"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Corporate Name
                       </label>
@@ -634,7 +634,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.dbaName"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         DBA Name
                       </label>
@@ -650,7 +650,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.businessType"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Business Type
                       </label>
@@ -666,7 +666,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.federalTaxIdNumber"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Federal Tax ID
                       </label>
@@ -682,7 +682,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.federalTaxIdType"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Tax ID Type
                       </label>
@@ -698,7 +698,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.mcc"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         MCC
                       </label>
@@ -716,7 +716,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.phone"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Phone
                       </label>
@@ -732,7 +732,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.email"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Email
                       </label>
@@ -748,7 +748,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.averageTicketAmount"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Avg Ticket Amount
                       </label>
@@ -764,7 +764,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.averageMonthlyVolume"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Avg Monthly Volume
                       </label>
@@ -780,7 +780,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.highTicketAmount"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         High Ticket Amount
                       </label>
@@ -796,7 +796,7 @@ const MerchantForm = () => {
                     <div className="form-group">
                       <label
                         htmlFor="business?.merchandiseServicesSold"
-                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Merchandise/Services
                       </label>
@@ -811,14 +811,14 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Business Transaction Percentages
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
                           htmlFor="business?.percentOfBusinessTransactions?.cardSwiped"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Card Swiped (%)
                         </label>
@@ -835,7 +835,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Keyed Card Present (%)
                         </label>
@@ -854,7 +854,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.percentOfBusinessTransactions?.mailOrPhoneOrder"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Mail/Phone Order (%)
                         </label>
@@ -871,7 +871,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.percentOfBusinessTransactions.internet"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Internet (%)
                         </label>
@@ -888,14 +888,14 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Business Contact
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact.firstName"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           First Name
                         </label>
@@ -911,7 +911,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.lastName"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Last Name
                         </label>
@@ -927,7 +927,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.socialSecurityNumber"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           SSN
                         </label>
@@ -943,7 +943,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.dateOfBirth"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Date of Birth
                         </label>
@@ -961,7 +961,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.street"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Street
                         </label>
@@ -977,7 +977,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.street2"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Street 2
                         </label>
@@ -993,7 +993,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.zipCode"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Zip Code
                         </label>
@@ -1009,7 +1009,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.city"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           City
                         </label>
@@ -1025,7 +1025,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.state"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           State
                         </label>
@@ -1041,7 +1041,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.phoneNumber"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Phone
                         </label>
@@ -1057,7 +1057,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessContact?.email"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Email
                         </label>
@@ -1076,13 +1076,13 @@ const MerchantForm = () => {
               )}
               {currentStep === 3 && (
                 <div className="form-section">
-                  <div className="section-title text-2xl font-bold text-gray-800 dark:text-gray-200 mb-6">
+                  <div className="section-title text-2xl font-bold text-white dark:text-white mb-6">
                     Principals & Additional Details
                   </div>
                   <div id="principalsContainer">
                     {formData.principals?.map((principal, index) => (
                       <div key={index} className="principal-section space-y-4">
-                        <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                        <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                           Principal {index + 1}
                         </div>
                         <button
@@ -1096,7 +1096,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].firstName`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               First Name
                             </label>
@@ -1112,7 +1112,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].lastName`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Last Name
                             </label>
@@ -1128,7 +1128,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].socialSecurityNumber`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               SSN
                             </label>
@@ -1144,7 +1144,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].dateOfBirth`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Date of Birth
                             </label>
@@ -1160,7 +1160,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].title`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Title
                             </label>
@@ -1176,7 +1176,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].equityOwnershipPercentage`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Ownership %
                             </label>
@@ -1195,7 +1195,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].street`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Street
                             </label>
@@ -1211,7 +1211,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].street2`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Street 2
                             </label>
@@ -1227,7 +1227,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].city`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               City
                             </label>
@@ -1243,7 +1243,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].state`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               State
                             </label>
@@ -1259,7 +1259,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].zipCode`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Zip Code
                             </label>
@@ -1275,7 +1275,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].phoneNumber`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Phone
                             </label>
@@ -1291,7 +1291,7 @@ const MerchantForm = () => {
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].email`}
-                              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Email
                             </label>
@@ -1318,7 +1318,7 @@ const MerchantForm = () => {
                   <div className="form-group">
                     <label
                       htmlFor="business?.statementDeliveryMethod"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                      className="block text-sm font-medium text-white dark:text-white mb-1"
                     >
                       Statement Delivery Method
                     </label>
@@ -1332,14 +1332,14 @@ const MerchantForm = () => {
                     />
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Business Addresses
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.dba.street"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA Street
                         </label>
@@ -1355,7 +1355,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.dba.city"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA City
                         </label>
@@ -1371,7 +1371,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.dba.state"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA State
                         </label>
@@ -1387,7 +1387,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.dba.zipCode"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA Zip
                         </label>
@@ -1405,7 +1405,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.corporate.street"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate Street
                         </label>
@@ -1421,7 +1421,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.corporate.city"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate City
                         </label>
@@ -1437,7 +1437,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.corporate.state"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate State
                         </label>
@@ -1453,7 +1453,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.corporate.zipCode"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate Zip
                         </label>
@@ -1471,7 +1471,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.shipTo.street"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo Street
                         </label>
@@ -1487,7 +1487,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.shipTo.city"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo City
                         </label>
@@ -1503,7 +1503,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.shipTo.state"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo State
                         </label>
@@ -1519,7 +1519,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.businessAddress.shipTo.zipCode"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo Zip
                         </label>
@@ -1535,14 +1535,14 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Website Information
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="form-group">
                         <label
                           htmlFor="business?.websites[0].url"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Website URL
                         </label>
@@ -1558,7 +1558,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.websites[0].websiteCustomerServiceEmail"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Customer Service Email
                         </label>
@@ -1574,7 +1574,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.websites[0].websiteCustomerServicePhoneNumber"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Customer Service Phone
                         </label>
@@ -1590,14 +1590,14 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       EBT Services
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="form-group">
                         <label
                           htmlFor="business?.ebt?.ebtType"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           EBT Type
                         </label>
@@ -1613,7 +1613,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="business?.ebt?.ebtAccountNumber"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           EBT Account Number
                         </label>
@@ -1629,14 +1629,14 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-gray-800 dark:text-gray-200">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Bank Account Information
                     </div>
                     <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="form-group">
                         <label
                           htmlFor="bankAccount.abaRouting"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ABA Routing
                         </label>
@@ -1652,7 +1652,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="bankAccount.accountType"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Account Type
                         </label>
@@ -1668,7 +1668,7 @@ const MerchantForm = () => {
                       <div className="form-group">
                         <label
                           htmlFor="bankAccount.demandDepositAccount"
-                          className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Demand Deposit Account
                         </label>
@@ -1699,8 +1699,8 @@ const MerchantForm = () => {
                 onClick={prevStep}
                 disabled={currentStep === 1}
                 className={`px-6 py-3 rounded-md font-medium ${currentStep === 1
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-gray-200 text-white cursor-not-allowed'
+                  : 'bg-gray-200 text-white hover:bg-gray-300'
                   }`}
               >
                 ← Previous

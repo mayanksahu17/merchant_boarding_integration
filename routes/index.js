@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const axios = require('axios');
 const applicationRoutes = require('./application.routes');
 const authRoutes = require('./auth.routes');
 const emailRoutes = require('./email.routes');
@@ -22,7 +23,7 @@ router.post('/api/merchant/full-update', async (req, res) => {
       return res.status(400).json({ error: 'externalKey is required' });
     }
     const response = await axios.patch(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
       req.body,
       {
         headers: {

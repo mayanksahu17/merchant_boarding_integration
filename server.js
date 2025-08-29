@@ -91,7 +91,7 @@ app.get('/api/test', (req, res) => {
 app.post("/api/application", async (req, res) => {
   try {
     const response = await axios.post(
-      "https://enrollment-api-sandbox.paymentshub.com/enroll/application",
+      "https://boarding-api.paymentshub.com/enroll/application",
       req.body,
       {
         headers: {
@@ -111,7 +111,7 @@ app.get("/api/application/:externalKey", async (req, res) => {
   try {
     const { externalKey } = req.params;
     const response = await axios.get(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
       {
         headers: {
           Authorization: `Bearer ${req.accessToken}`,
@@ -129,7 +129,7 @@ app.patch("/api/application/:externalKey", async (req, res) => {
   try {
     const { externalKey } = req.params;
     const response = await axios.patch(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
       req.body,
       {
         headers: {
@@ -148,7 +148,7 @@ app.put("/api/application/merchant/send/:externalKey", async (req, res) => {
   try {
     const { externalKey } = req.params;
     const response = await axios.put(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/merchant/send/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/merchant/send/key/${externalKey}`,
       {},
       {
         headers: {
@@ -167,7 +167,7 @@ app.get("/api/application/validate/:externalKey", async (req, res) => {
   try {
     const { externalKey } = req.params;
     const response = await axios.get(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/validate/${encodeURIComponent(externalKey)}`,
+      `https://boarding-api.paymentshub.com/enroll/application/validate/${encodeURIComponent(externalKey)}`,
       {
         headers: {
           Authorization: `Bearer ${req.accessToken}`,
@@ -185,7 +185,7 @@ app.put("/api/application/submit/:externalKey", async (req, res) => {
   try {
     const { externalKey } = req.params;
     const response = await axios.put(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/submit/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/submit/${externalKey}`,
       {},
       {
         headers: {
@@ -206,7 +206,7 @@ app.post("/api/application/submit/:externalKey", async (req, res) => {
     console.log(`🚀 Submitting application ${externalKey} to underwriting...`);
     
     const response = await axios.put(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/submit/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/submit/${externalKey}`,
       {},
       {
         headers: {
@@ -231,7 +231,7 @@ app.post('/api/merchant/full-update', async (req, res) => {
       return res.status(400).json({ error: 'externalKey is required' });
     }
     const response = await axios.patch(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
       req.body,
       {
         headers: {

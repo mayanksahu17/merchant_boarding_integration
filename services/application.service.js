@@ -187,7 +187,7 @@ const submitToUnderwriting = async (externalKey) => {
 const getApplicationPDF = async (externalKey, accessToken) => {
   try {
     const response = await axios.get(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/application/pdf/key/${externalKey}`,
+      `https://boarding-api.paymentshub.com/enroll/application/pdf/key/${externalKey}`,
       {
         responseType: 'arraybuffer',
         headers: {
@@ -261,7 +261,7 @@ const getDocumentTypes = async (accessToken) => {
 const uploadDocumentToPaymentsHub = async (externalKey, documentData, accessToken) => {
   try {
     const response = await axios.put(
-      `https://enrollment-api-sandbox.paymentshub.com/enroll/document/upload/key/${externalKey}`,
+      `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/document/upload/key/${externalKey}`,
       {
         fileName: documentData.fileName,
         fileType: documentData.fileType,

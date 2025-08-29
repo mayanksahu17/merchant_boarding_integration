@@ -270,10 +270,6 @@ const MerchantForm = () => {
       const bankDocs = ['voided_check', 'bank_statement', 'processing_statement'];
       const hasBankDoc = documents.some(doc => bankDocs.includes(doc.type));
 
-      if (needsBankVerification && !hasBankDoc) {
-        throw new Error('Please upload at least one bank verification document (Voided check, Bank statement, or Processing statement)');
-      }
-
       const validateData = await validateApplication(formData.externalKey);
       setValidationResponse(validateData);
       if (validateData) {

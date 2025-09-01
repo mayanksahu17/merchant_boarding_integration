@@ -20,7 +20,9 @@ router.post('/emails/merchant-link', authenticate, applicationController.sendMer
 
 // Application specific routes
 router.get('/:externalKey', authenticate, applicationController.getApplication);
+router.get('/:externalKey/data-summary', authenticate, applicationController.getApplicationDataSummary);
 router.patch('/:externalKey', authenticate, applicationController.updateApplication);
+router.post('/:externalKey/save', authenticate, applicationController.saveApplication);
 router.delete('/:externalKey', authenticate, applicationController.deleteApplication);
 
 // Validation routes

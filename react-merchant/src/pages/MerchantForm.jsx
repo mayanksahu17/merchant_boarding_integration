@@ -7,6 +7,7 @@ import ErrorModal from '../components/ErrorModal';
 import DocumentUpload from '../components/DocumentUpload';
 import {
   getApplication,
+  getApplicationDataSummary,
   validateApplication,
   submitToUnderwriting,
   saveApplication,
@@ -80,6 +81,11 @@ const MerchantForm = () => {
       demandDepositAccount: '',
     },
     statementDeliveryMethod: 'electronic',
+    // Add missing fields that might be needed
+    applicationEmail: '',
+    status: 'draft',
+    documents: [],
+    merchantLink: '',
   });
 
   const [showThankYou, setShowThankYou] = useState(false);
@@ -87,8 +93,151 @@ const MerchantForm = () => {
   const [validationResponse, setValidationResponse] = useState(null);
   const [isExistingApplication, setIsExistingApplication] = useState(false);
   const [errors, setErrors] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [lastSaved, setLastSaved] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [bankVerificationRequired, setBankVerificationRequired] = useState(false);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (formData.externalKey) {
+      localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
+    }
+  }, [formData]);
+
+  // Load form data from localStorage on component mount
+  useEffect(() => {
+    const externalKey = searchParams.get('key');
+    if (externalKey) {
+      const savedFormData = localStorage.getItem(`formData_${externalKey}`);
+      if (savedFormData) {
+        try {
+          const parsedData = JSON.parse(savedFormData);
+          setFormData(parsedData);
+          setIsExistingApplication(true);
+        } catch (error) {
+          console.error('Error parsing saved form data:', error);
+        }
+      }
+    }
+  }, [searchParams]);
+
+  // Ensure all nested objects are properly initialized
+  useEffect(() => {
+    console.log('🔧 Initializing form data structure...');
+    setFormData(prev => {
+      const updated = { ...prev };
+      
+      // Ensure business object exists
+      if (!updated.business) {
+        console.log('📝 Creating business object structure...');
+        updated.business = {
+          corporateName: '',
+          dbaName: '',
+          businessType: '',
+          federalTaxIdNumber: '',
+          federalTaxIdType: 'EIN',
+          mcc: '',
+          phone: '',
+          email: '',
+          averageTicketAmount: '',
+          averageMonthlyVolume: '',
+          highTicketAmount: '',
+          merchandiseServicesSold: '',
+          percentOfBusinessTransactions: {
+            cardSwiped: '',
+            keyedCardPresentNotImprinted: '',
+            mailOrPhoneOrder: '',
+            internet: '',
+          },
+          businessContact: {
+            firstName: '',
+            lastName: '',
+            socialSecurityNumber: '',
+            dateOfBirth: '',
+            street: '',
+            street2: '',
+            zipCode: '',
+            city: '',
+            state: '',
+            phoneNumber: '',
+            email: '',
+          },
+          businessAddress: {
+            dba: { street: '', city: '', state: '', zipCode: '' },
+            corporate: { street: '', city: '', state: '', zipCode: '' },
+            shipTo: { street: '', city: '', state: '', zipCode: '' },
+          },
+          websites: [{ url: '', websiteCustomerServiceEmail: '', websiteCustomerServicePhoneNumber: '' }],
+          ebt: { ebtType: '', ebtAccountNumber: '' },
+        };
+      }
+      
+      // Ensure other required objects exist
+      if (!updated.plan) {
+        updated.plan = {
+          planId: '',
+          equipmentCostToMerchant: 0,
+          accountSetupFee: 0,
+          discountFrequency: 'Daily',
+          equipment: [{ equipmentId: 1155, quantity: 1 }],
+        };
+      }
+      
+      if (!updated.shipping) {
+        updated.shipping = {
+          shippingDestination: 'DBA',
+          deliveryMethod: 'Ground',
+        };
+      }
+      
+      if (!updated.bankAccount) {
+        updated.bankAccount = {
+          abaRouting: '',
+          accountType: 'checking',
+          demandDepositAccount: '',
+        };
+      }
+      
+      if (!updated.principals || updated.principals.length === 0) {
+        console.log('👥 Initializing principals array with default principal...');
+        updated.principals = [{
+          firstName: '',
+          lastName: '',
+          socialSecurityNumber: '',
+          dateOfBirth: '',
+          phoneNumber: '',
+          email: '',
+          street: '',
+          street2: '',
+          zipCode: '',
+          city: '',
+          state: '',
+          equityOwnershipPercentage: 0,
+          title: '',
+          isPersonalGuarantor: false,
+          driverLicenseNumber: '',
+          driverLicenseIssuedState: '',
+        }];
+      }
+      
+      if (!updated.statementDeliveryMethod) {
+        updated.statementDeliveryMethod = 'electronic';
+      }
+      
+      console.log('✅ Form data structure initialized:', {
+        hasBusiness: !!updated.business,
+        hasBusinessAddress: !!updated.business?.businessAddress,
+        hasBusinessContact: !!updated.business?.businessContact,
+        hasPercentOfBusinessTransactions: !!updated.business?.percentOfBusinessTransactions,
+        hasWebsites: !!updated.business?.websites,
+        hasEbt: !!updated.business?.ebt
+      });
+      
+      return updated;
+    });
+  }, []);
 
   const formatDateForInput = (date) => {
     if (!date) return '';
@@ -110,6 +259,11 @@ const MerchantForm = () => {
   const handleInputChange = (e) => {
     const { name, value, type } = e.target;
     let processedValue = value;
+    
+    // Debug logging for principal fields
+    if (name.includes('principals')) {
+      console.log('🔍 Principal field change:', { name, value, type });
+    }
 
     // Convert to number if the field is numeric
     if (type === 'number' || name.includes('plan.') || name.includes('equipment') || name.includes('percentOfBusinessTransactions') || name.includes('accountSetupFee') || name.includes('equipmentCostToMerchant')) {
@@ -121,45 +275,57 @@ const MerchantForm = () => {
       processedValue = value;
     }
 
-    // Handle nested fields (e.g., plan.equipment[0].quantity)
+    // Clear any previous errors when user starts typing
+    if (errors) {
+      setErrors(null);
+    }
+    
+    // Mark that there are unsaved changes
+    setHasUnsavedChanges(true);
+
+    // Handle nested fields (e.g., business.corporateName, plan.planId, business.websites.0.url)
     if (name.includes('.')) {
       const keys = name.split('.');
+      
       setFormData((prev) => {
         const newState = { ...prev };
         let current = newState;
+        
+        // Navigate to the parent object
         for (let i = 0; i < keys.length - 1; i++) {
-          const arrayMatch = keys[i].match(/(\w+)\[(\d+)\]/);
-          if (arrayMatch) {
-            const arrayName = arrayMatch[1];
-            const arrayIndex = parseInt(arrayMatch[2]);
-            if (!current[arrayName] || !Array.isArray(current[arrayName])) {
-              current[arrayName] = [];
+          const key = keys[i];
+          
+          // Handle array indices (e.g., websites.0.url)
+          if (!isNaN(key) && Array.isArray(current)) {
+            // Ensure array exists and has enough elements
+            while (current.length <= parseInt(key)) {
+              current.push({});
             }
-            if (!current[arrayName][arrayIndex]) {
-              current[arrayName][arrayIndex] = {};
+            current = current[parseInt(key)];
+          } else if (!isNaN(key) && !Array.isArray(current)) {
+            // Convert to array if needed
+            current[key] = [];
+            while (current[key].length <= parseInt(key)) {
+              current[key].push({});
             }
-            current = current[arrayName][arrayIndex];
+            current = current[key][parseInt(key)];
           } else {
-            if (!current[keys[i]]) {
-              current[keys[i]] = {};
+            // Handle regular object keys
+            if (!current[key]) {
+              current[key] = {};
             }
-            current = current[keys[i]];
+            current = current[key];
           }
         }
-        const lastKeyArrayMatch = keys[keys.length - 1].match(/(\w+)\[(\d+)\]/);
-        if (lastKeyArrayMatch) {
-          const arrayName = lastKeyArrayMatch[1];
-          const arrayIndex = parseInt(lastKeyArrayMatch[2]);
-          if (!current[arrayName] || !Array.isArray(current[arrayName])) {
-            current[arrayName] = [];
-          }
-          current[arrayName][arrayIndex] = processedValue;
-        } else {
-          current[keys[keys.length - 1]] = processedValue;
-        }
+        
+        // Set the final value
+        const lastKey = keys[keys.length - 1];
+        current[lastKey] = processedValue;
+        
         return newState;
       });
     } else {
+      // Handle simple fields
       setFormData((prev) => ({
         ...prev,
         [name]: processedValue,
@@ -173,13 +339,44 @@ const MerchantForm = () => {
     setLoadingMessage('Loading application data...');
     try {
       const data = await getApplication(externalKey);
-      if (data) {
+      
+      console.log('📥 Raw data received:', data);
+      
+      if (data && data.status !== 'error') {
+        // Prioritize MongoDB data, fallback to PaymentsHub data
         const appData = data.mongoApplication || data.paymentsHubResponse || data;
-        setFormData(formatDatesInResponse(appData));
-        setDocuments(appData.documents || []);
+        
+        if (appData) {
+          console.log('📥 Application data loaded:', {
+            hasBusiness: !!appData.business,
+            hasPrincipals: !!appData.principals,
+            hasPlan: !!appData.principals,
+            hasBankAccount: !!appData.bankAccount,
+            hasShipping: !!appData.shipping,
+            hasStatementDelivery: !!appData.statementDeliveryMethod,
+            businessFields: appData.business ? Object.keys(appData.business) : [],
+            principalCount: appData.principals ? appData.principals.length : 0
+          });
+          
+          const formattedData = formatDatesInResponse(appData);
+          console.log('📝 Formatted data:', formattedData);
+          setFormData(formattedData);
+          setDocuments(appData.documents || []);
+          
+          // Set existing application flag
+          setIsExistingApplication(true);
+          
+          setSuccessMessage('Application data loaded successfully!');
+          setTimeout(() => setSuccessMessage(''), 3000);
+        } else {
+          console.warn('No application data found');
+        }
+      } else {
+        console.error('Failed to load application data:', data?.message || 'Unknown error');
       }
     } catch (error) {
       console.error('Error loading application data:', error);
+      // Don't show error modal for loading failures, just log them
     } finally {
       setIsLoading(false);
     }
@@ -190,23 +387,178 @@ const MerchantForm = () => {
 
     const formatted = { ...data };
 
+    // Handle business data structure
     if (formatted['business?']) {
       formatted.business = formatted['business?'];
       delete formatted['business?'];
     }
 
-    if (formatted.principals && Array.isArray(formatted.principals)) {
+    // Ensure business object exists with all nested objects
+    if (!formatted.business) {
+      formatted.business = {
+        corporateName: '',
+        dbaName: '',
+        businessType: '',
+        federalTaxIdNumber: '',
+        federalTaxIdType: 'EIN',
+        mcc: '',
+        phone: '',
+        email: '',
+        averageTicketAmount: '',
+        averageMonthlyVolume: '',
+        highTicketAmount: '',
+        merchandiseServicesSold: '',
+        percentOfBusinessTransactions: {
+          cardSwiped: '',
+          keyedCardPresentNotImprinted: '',
+          mailOrPhoneOrder: '',
+          internet: '',
+        },
+        businessContact: {
+          firstName: '',
+          lastName: '',
+          socialSecurityNumber: '',
+          dateOfBirth: '',
+          street: '',
+          street2: '',
+          zipCode: '',
+          city: '',
+          state: '',
+          phoneNumber: '',
+          email: '',
+        },
+        businessAddress: {
+          dba: { street: '', city: '', state: '', zipCode: '' },
+          corporate: { street: '', city: '', state: '', zipCode: '' },
+          shipTo: { street: '', city: '', state: '', zipCode: '' },
+        },
+        websites: [{ url: '', websiteCustomerServiceEmail: '', websiteCustomerServicePhoneNumber: '' }],
+        ebt: { ebtType: '', ebtAccountNumber: '' },
+      };
+    } else {
+      // Ensure nested objects exist even if business object exists
+      if (!formatted.business.percentOfBusinessTransactions) {
+        formatted.business.percentOfBusinessTransactions = {
+          cardSwiped: '',
+          keyedCardPresentNotImprinted: '',
+          mailOrPhoneOrder: '',
+          internet: '',
+        };
+      }
+      
+      if (!formatted.business.businessContact) {
+        formatted.business.businessContact = {
+          firstName: '',
+          lastName: '',
+          socialSecurityNumber: '',
+          dateOfBirth: '',
+          street: '',
+          street2: '',
+          zipCode: '',
+          city: '',
+          state: '',
+          phoneNumber: '',
+          email: '',
+        };
+      }
+      
+      if (!formatted.business.businessAddress) {
+        formatted.business.businessAddress = {
+          dba: { street: '', city: '', state: '', zipCode: '' },
+          corporate: { street: '', city: '', state: '', zipCode: '' },
+          shipTo: { street: '', city: '', state: '', zipCode: '' },
+        };
+      } else {
+        // Ensure each address type exists
+        if (!formatted.business.businessAddress.dba) {
+          formatted.business.businessAddress.dba = { street: '', city: '', state: '', zipCode: '' };
+        }
+        if (!formatted.business.businessAddress.corporate) {
+          formatted.business.businessAddress.corporate = { street: '', city: '', state: '', zipCode: '' };
+        }
+        if (!formatted.business.businessAddress.shipTo) {
+          formatted.business.businessAddress.shipTo = { street: '', city: '', state: '', zipCode: '' };
+        }
+      }
+      
+      if (!formatted.business.websites || !Array.isArray(formatted.business.websites)) {
+        formatted.business.websites = [{ url: '', websiteCustomerServiceEmail: '', websiteCustomerServicePhoneNumber: '' }];
+      }
+      
+      if (!formatted.business.ebt) {
+        formatted.business.ebt = { ebtType: '', ebtAccountNumber: '' };
+      }
+    }
+
+    // Ensure plan object exists
+    if (!formatted.plan) {
+      formatted.plan = {
+        planId: '',
+        equipmentCostToMerchant: 0,
+        accountSetupFee: 0,
+        discountFrequency: 'Daily',
+        equipment: [{ equipmentId: 1155, quantity: 1 }],
+      };
+    }
+
+    // Ensure shipping object exists
+    if (!formatted.shipping) {
+      formatted.shipping = {
+        shippingDestination: 'DBA',
+        deliveryMethod: 'Ground',
+      };
+    }
+
+    // Ensure bankAccount object exists
+    if (!formatted.bankAccount) {
+      formatted.bankAccount = {
+        abaRouting: '',
+        accountType: 'checking',
+        demandDepositAccount: '',
+      };
+    }
+
+    // Ensure principals array exists and has at least one principal
+    if (!formatted.principals || !Array.isArray(formatted.principals) || formatted.principals.length === 0) {
+      console.log('👥 No principals found, creating default principal...');
+      formatted.principals = [{
+        firstName: '',
+        lastName: '',
+        socialSecurityNumber: '',
+        dateOfBirth: '',
+        phoneNumber: '',
+        email: '',
+        street: '',
+        street2: '',
+        zipCode: '',
+        city: '',
+        state: '',
+        equityOwnershipPercentage: 0,
+        title: '',
+        isPersonalGuarantor: false,
+        driverLicenseNumber: '',
+        driverLicenseIssuedState: '',
+      }];
+    } else {
+      // Format dates in existing principals
       formatted.principals = formatted.principals.map((principal) => ({
         ...principal,
         dateOfBirth: formatDateForInput(principal.dateOfBirth),
       }));
     }
 
+    // Format business contact date of birth
     if (formatted.business?.businessContact?.dateOfBirth) {
       formatted.business.businessContact.dateOfBirth = formatDateForInput(
         formatted.business.businessContact.dateOfBirth
       );
     }
+
+    // Ensure default values for required fields
+    if (!formatted.agent) formatted.agent = 96194;
+    if (!formatted.applicationName) formatted.applicationName = '';
+    if (!formatted.externalKey) formatted.externalKey = '';
+    if (!formatted.statementDeliveryMethod) formatted.statementDeliveryMethod = 'electronic';
 
     return formatted;
   };
@@ -214,6 +566,8 @@ const MerchantForm = () => {
   const saveForm = async () => {
     setIsLoading(true);
     setLoadingMessage('Saving application...');
+    setSuccessMessage(''); // Clear any previous success message
+    setErrors(null); // Clear any previous errors
     try {
       const dataToSend = { ...formData };
       if (dataToSend['business?']) {
@@ -221,22 +575,65 @@ const MerchantForm = () => {
         delete dataToSend['business?'];
       }
 
-      const response = await updateApplication(dataToSend.externalKey, dataToSend);
-      if (response?.mongoApplication?.externalKey) {
-        setFormData((prev) => ({
-          ...prev,
-          externalKey: response.mongoApplication.externalKey,
-        }));
+      // Log the complete data being sent
+      console.log('💾 Saving complete form data to MongoDB:', {
+        externalKey: dataToSend.externalKey,
+        agent: dataToSend.agent,
+        applicationName: dataToSend.applicationName,
+        plan: dataToSend.plan,
+        shipping: dataToSend.shipping,
+        business: {
+          corporateName: dataToSend.business?.corporateName,
+          dbaName: dataToSend.business?.dbaName,
+          businessType: dataToSend.business?.businessType,
+          federalTaxIdNumber: dataToSend.business?.federalTaxIdNumber,
+          mcc: dataToSend.business?.mcc,
+          phone: dataToSend.business?.phone,
+          email: dataToSend.business?.email,
+          averageTicketAmount: dataToSend.business?.averageTicketAmount,
+          averageMonthlyVolume: dataToSend.business?.averageMonthlyVolume,
+          highTicketAmount: dataToSend.business?.highTicketAmount,
+          merchandiseServicesSold: dataToSend.business?.merchandiseServicesSold,
+          percentOfBusinessTransactions: dataToSend.business?.percentOfBusinessTransactions,
+          businessContact: dataToSend.business?.businessContact,
+          businessAddress: dataToSend.business?.businessAddress,
+          websites: dataToSend.business?.websites,
+          ebt: dataToSend.business?.ebt
+        },
+        principals: dataToSend.principals,
+        bankAccount: dataToSend.bankAccount,
+        statementDeliveryMethod: dataToSend.statementDeliveryMethod,
+        documents: dataToSend.documents
+      });
+
+      // Use the new save endpoint that only saves to MongoDB
+      const response = await saveApplication(dataToSend.externalKey, dataToSend);
+      
+      if (response?.status === 'success' && response?.mongoApplication?.externalKey) {
+        // Don't overwrite the current form data - just update the timestamp
+        // This keeps the user's current input intact
         setIsExistingApplication(true);
+        
+        // Also save to localStorage for frontend persistence
+        if (response.mongoApplication?.externalKey) {
+          localStorage.setItem(`formData_${response.mongoApplication.externalKey}`, JSON.stringify(formData));
+        }
+        
+        // Show success message and update last saved timestamp
+        setSuccessMessage('Application saved successfully!');
+        setLastSaved(new Date());
+        setHasUnsavedChanges(false); // Clear unsaved changes flag
+        console.log('✅ Application saved successfully to MongoDB');
+        
+        // Log what was actually saved
+        console.log('📊 MongoDB response:', response.mongoApplication);
+      } else {
+        throw new Error('Invalid response from save endpoint');
       }
     } catch (error) {
-      console.error('Error saving application:', error);
-      if (error.status === "error") {
-        console.error('Validation errors:', error);
-        setErrors(error.response.data?.errors || {});
-      } else {
-        setErrors({ general: ['Failed to save application. Please try again.', error.message] });
-      }
+      console.error('❌ Error saving application:', error);
+      // Don't show error modal for save failures, just log them
+      // The user can continue working on the form
     } finally {
       setIsLoading(false);
     }
@@ -260,7 +657,10 @@ const MerchantForm = () => {
   const submitForm = async () => {
     setIsLoading(true);
     setLoadingMessage('Validating application...');
+    setSuccessMessage(''); // Clear any previous success message
+    setErrors(null); // Clear any previous errors
     try {
+      // First save the current form data to MongoDB
       await saveForm();
 
       // Validate bank information
@@ -270,24 +670,47 @@ const MerchantForm = () => {
       const bankDocs = ['voided_check', 'bank_statement', 'processing_statement'];
       const hasBankDoc = documents.some(doc => bankDocs.includes(doc.type));
 
-      if (needsBankVerification && !hasBankDoc) {
-        throw new Error('Please upload at least one bank verification document (Voided check, Bank statement, or Processing statement)');
-      }
-
+      // Validate the application
       const validateData = await validateApplication(formData.externalKey);
       setValidationResponse(validateData);
-      if (validateData) {
-        setLoadingMessage('Submitting application...');
+      
+              if (validateData) {
+          setLoadingMessage('Submitting application to PaymentsHub...');
+          
+          // Submit to underwriting (this will call PaymentsHub API)
         const submitResponse = await submitToUnderwriting(formData.externalKey, formData);
-        setSubmissionResponse(submitResponse);
-        setShowThankYou(true);
+        
+        if (submitResponse?.status === 'success') {
+          setSubmissionResponse(submitResponse);
+          setShowThankYou(true);
+          
+          // Clear localStorage after successful submission
+          if (formData.externalKey) {
+            localStorage.removeItem(`formData_${formData.externalKey}`);
+          }
+        } else {
+          throw new Error(submitResponse?.message || 'Failed to submit application');
+        }
       }
     } catch (error) {
       console.error('Error submitting application:', error);
-      if (error.response && error.response.data && error.response.data.errors) {
-        setErrors(error.response.data.errors);
+      
+      // Handle different types of errors
+      if (error.response?.data) {
+        // API error response
+        const errorData = error.response.data;
+        if (errorData.errors) {
+          setErrors(errorData.errors);
+        } else if (errorData.error) {
+          setErrors({ general: [errorData.error] });
+        } else {
+          setErrors({ general: [errorData.message || 'Failed to submit application'] });
+        }
+      } else if (error.message) {
+        // Local error
+        setErrors({ general: [error.message] });
       } else {
-        setErrors({ general: [error.message || 'Failed to submit application. Please try again.'] });
+        setErrors({ general: ['Failed to submit application. Please try again.'] });
       }
     } finally {
       setIsLoading(false);
@@ -296,18 +719,32 @@ const MerchantForm = () => {
 
   useEffect(() => {
     const externalKey = searchParams.get('key');
-    if (externalKey) {
+    if (externalKey && !isExistingApplication) {
       setFormData((prev) => ({
         ...prev,
         externalKey,
       }));
       loadApplicationData(externalKey);
       setIsExistingApplication(true);
-    } else {
-      addPrincipal();
+    } else if (!externalKey && !isExistingApplication) {
+      // Only add one principal initially, the form will handle adding more if needed
       addPrincipal();
     }
-  }, [searchParams]);
+  }, [searchParams, isExistingApplication]);
+
+  // Warn user before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const addPrincipal = (principalData = {}) => {
     setFormData((prev) => ({
@@ -349,21 +786,62 @@ const MerchantForm = () => {
 
   const nextStep = () => {
     if (currentStep < 3) {
+      // Auto-save to localStorage before moving to next step
+      if (formData.externalKey && hasUnsavedChanges) {
+        localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
+        setHasUnsavedChanges(false);
+        setSuccessMessage('Form auto-saved before moving to next step');
+        setTimeout(() => setSuccessMessage(''), 2000);
+      }
       setCurrentStep(currentStep + 1);
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
+      // Auto-save to localStorage before moving to previous step
+      if (formData.externalKey && hasUnsavedChanges) {
+        localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
+        setHasUnsavedChanges(false);
+        setSuccessMessage('Form auto-saved before moving to previous step');
+        setTimeout(() => setSuccessMessage(''), 2000);
+      }
       setCurrentStep(currentStep - 1);
     }
   };
+
+  // Safety check to prevent rendering with undefined data - less restrictive
+  if (!formData.business) {
+    console.log('⚠️ Form data not fully initialized yet, showing loading...');
+    return (
+      <div className="min-h-screen bg-black py-8 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <div className="text-white text-xl">Initializing form...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black py-8 px-4 sm:px-6 lg:px-8">
       {isLoading && <LoadingOverlay message={loadingMessage} />}
       {errors && <ErrorModal errors={errors} onClose={() => setErrors(null)
       } />}
+      {successMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-green-800 text-white p-6 rounded-lg shadow-lg max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <div className="text-green-400 text-2xl mr-3">✅</div>
+              <h3 className="text-lg font-semibold">Success!</h3>
+            </div>
+            <p className="mb-4">{successMessage}</p>
+            <button
+              onClick={() => setSuccessMessage('')}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
       {showThankYou ? (
         <ThankYouMessage
           submissionResponse={submissionResponse}
@@ -376,8 +854,40 @@ const MerchantForm = () => {
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-white">Merchant Application Form</h1>
               <p className="text-white mt-2">Complete merchant and business details for processing</p>
+              {isExistingApplication && (
+                <div className="mt-4 p-3 bg-blue-900 border border-blue-700 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="text-blue-300 mr-2">📝</div>
+                      <span className="text-blue-200 text-sm">
+                        This is an existing application. You can edit any field and save your changes.
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className={`text-xs flex items-center ${hasUnsavedChanges ? 'text-yellow-300' : 'text-green-300'}`}>
+                        <span className={`w-2 h-2 rounded-full mr-2 ${hasUnsavedChanges ? 'bg-yellow-400' : 'bg-green-400'}`}></span>
+                        {hasUnsavedChanges ? 'Form has unsaved changes' : 'Form is editable'}
+                      </div>
+                      {lastSaved && (
+                        <div className="text-blue-300 text-xs">
+                          Last saved: {lastSaved.toLocaleTimeString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+
+                </div>
+              )}
             </div>
             <ProgressBar currentStep={currentStep} totalSteps={3} />
+            {hasUnsavedChanges && (
+              <div className="mt-2 text-center">
+                <span className="text-yellow-400 text-sm">
+                  ⚠️ You have unsaved changes. Data will be auto-saved when navigating between steps.
+                </span>
+              </div>
+            )}
             <div className="mt-8 space-y-6">
               {currentStep === 1 && (
                 <div className="form-section active space-y-6">
@@ -394,7 +904,7 @@ const MerchantForm = () => {
                         id="agent"
                         name="agent"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.agent}
+                        value={formData.agent || ''}
                         onChange={handleInputChange}
                         required
                         readOnly
@@ -411,10 +921,11 @@ const MerchantForm = () => {
                         type="text"
                         id="applicationName"
                         name="applicationName"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.applicationName}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.applicationName || ''}
                         onChange={handleInputChange}
                         required
+                        placeholder="Enter application name"
                       />
                     </div>
                     <div className="form-group">
@@ -429,7 +940,7 @@ const MerchantForm = () => {
                         id="externalKey"
                         name="externalKey"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.externalKey}
+                        value={formData.externalKey || ''}
                         onChange={handleInputChange}
                         required
                         readOnly
@@ -449,7 +960,7 @@ const MerchantForm = () => {
                         id="plan.planId"
                         name="plan.planId"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.plan.planId}
+                        value={formData.plan?.planId || ''}
                         onChange={handleInputChange}
                         required
                       />
@@ -466,7 +977,7 @@ const MerchantForm = () => {
                         id="plan.equipmentCostToMerchant"
                         name="plan.equipmentCostToMerchant"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.plan.equipmentCostToMerchant}
+                        value={formData.plan?.equipmentCostToMerchant || ''}
                         onChange={handleInputChange}
                         step="0.01"
                       />
@@ -483,7 +994,7 @@ const MerchantForm = () => {
                         id="plan.accountSetupFee"
                         name="plan.accountSetupFee"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.plan.accountSetupFee}
+                        value={formData.plan?.accountSetupFee || ''}
                         onChange={(e) => {
                           const value = e.target.value;
                           // Only allow numbers and decimal points
@@ -525,7 +1036,7 @@ const MerchantForm = () => {
                         id="plan.discountFrequency"
                         name="plan.discountFrequency"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.plan.discountFrequency}
+                        value={formData.plan?.discountFrequency || ''}
                         onChange={handleInputChange}
                       />
                     </div>
@@ -539,33 +1050,33 @@ const MerchantForm = () => {
                         <>
                           <div className="form-group">
                             <label
-                              htmlFor="plan.equipment[0].equipmentId"
+                              htmlFor="plan.equipment.0.equipmentId"
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Equipment ID
                             </label>
                             <input
                               type="number"
-                              id="plan.equipment[0].equipmentId"
-                              name="plan.equipment[0].equipmentId"
+                              id="plan.equipment.0.equipmentId"
+                              name="plan.equipment.0.equipmentId"
                               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={formData.plan.equipment[0].equipmentId}
+                              value={formData.plan.equipment[0]?.equipmentId || ''}
                               onChange={handleInputChange}
                             />
                           </div>
                           <div className="form-group">
                             <label
-                              htmlFor="plan.equipment[0].quantity"
+                              htmlFor="plan.equipment.0.quantity"
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
                               Quantity
                             </label>
                             <input
                               type="number"
-                              id="plan.equipment[0].quantity"
-                              name="plan.equipment[0].quantity"
+                              id="plan.equipment.0.quantity"
+                              name="plan.equipment.0.quantity"
                               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={formData.plan.equipment[0].quantity}
+                              value={formData.plan.equipment[0]?.quantity || ''}
                               onChange={handleInputChange}
                             />
                           </div>
@@ -576,33 +1087,33 @@ const MerchantForm = () => {
                   <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="form-group">
                       <label
-                        htmlFor="shipping?.shippingDestination"
+                        htmlFor="shipping.shippingDestination"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Shipping Destination
                       </label>
                       <input
                         type="text"
-                        id="shipping?.shippingDestination"
-                        name="shipping?.shippingDestination"
+                        id="shipping.shippingDestination"
+                        name="shipping.shippingDestination"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.shipping?.shippingDestination}
+                        value={formData.shipping?.shippingDestination || ''}
                         onChange={handleInputChange}
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="shipping?.deliveryMethod"
+                        htmlFor="shipping.deliveryMethod"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Delivery Method
                       </label>
                       <input
                         type="text"
-                        id="shipping?.deliveryMethod"
-                        name="shipping?.deliveryMethod"
+                        id="shipping.deliveryMethod"
+                        name="shipping.deliveryMethod"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.shipping?.deliveryMethod}
+                        value={formData.shipping?.deliveryMethod || ''}
                         onChange={handleInputChange}
                       />
                     </div>
@@ -617,195 +1128,203 @@ const MerchantForm = () => {
                   <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="form-group">
                       <label
-                        htmlFor="business?.corporateName"
+                        htmlFor="business.corporateName"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Corporate Name
                       </label>
                       <input
                         type="text"
-                        id="business?.corporateName"
-                        name="business?.corporateName"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.corporateName}
+                        id="business.corporateName"
+                        name="business.corporateName"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.corporateName || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter corporate name"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.dbaName"
+                        htmlFor="business.dbaName"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         DBA Name
                       </label>
                       <input
                         type="text"
-                        id="business?.dbaName"
-                        name="business?.dbaName"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.dbaName}
+                        id="business.dbaName"
+                        name="business.dbaName"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.dbaName || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter DBA name"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.businessType"
+                        htmlFor="business.businessType"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Business Type
                       </label>
                       <input
                         type="text"
-                        id="business?.businessType"
-                        name="business?.businessType"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.businessType}
+                        id="business.businessType"
+                        name="business.businessType"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.businessType || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter business type"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.federalTaxIdNumber"
+                        htmlFor="business.federalTaxIdNumber"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Federal Tax ID
                       </label>
                       <input
                         type="text"
-                        id="business?.federalTaxIdNumber"
-                        name="business?.federalTaxIdNumber"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.federalTaxIdNumber}
+                        id="business.federalTaxIdNumber"
+                        name="business.federalTaxIdNumber"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.federalTaxIdNumber || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter federal tax ID"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.federalTaxIdType"
+                        htmlFor="business.federalTaxIdType"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Tax ID Type
                       </label>
                       <input
                         type="text"
-                        id="business?.federalTaxIdType"
-                        name="business?.federalTaxIdType"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.federalTaxIdType}
+                        id="business.federalTaxIdType"
+                        name="business.federalTaxIdType"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.federalTaxIdType || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter tax ID type"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.mcc"
+                        htmlFor="business.mcc"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         MCC
                       </label>
                       <input
                         type="text"
-                        id="business?.mcc"
-                        name="business?.mcc"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.mcc}
+                        id="business.mcc"
+                        name="business.mcc"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.mcc || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter MCC"
                       />
                     </div>
                   </div>
                   <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="form-group">
                       <label
-                        htmlFor="business?.phone"
+                        htmlFor="business.phone"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Phone
                       </label>
                       <input
                         type="text"
-                        id="business?.phone"
-                        name="business?.phone"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.phone}
+                        id="business.phone"
+                        name="business.phone"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.phone || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter phone number"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.email"
+                        htmlFor="business.email"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Email
                       </label>
                       <input
                         type="email"
-                        id="business?.email"
-                        name="business?.email"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.email}
+                        id="business.email"
+                        name="business.email"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                        value={formData.business?.email || ''}
                         onChange={handleInputChange}
+                        placeholder="Enter email address"
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.averageTicketAmount"
+                        htmlFor="business.averageTicketAmount"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Avg Ticket Amount
                       </label>
                       <input
                         type="number"
-                        id="business?.averageTicketAmount"
-                        name="business?.averageTicketAmount"
+                        id="business.averageTicketAmount"
+                        name="business.averageTicketAmount"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.averageTicketAmount}
+                        value={formData.business?.averageTicketAmount || ''}
                         onChange={handleInputChange}
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.averageMonthlyVolume"
+                        htmlFor="business.averageMonthlyVolume"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Avg Monthly Volume
                       </label>
                       <input
                         type="number"
-                        id="business?.averageMonthlyVolume"
-                        name="business?.averageMonthlyVolume"
+                        id="business.averageMonthlyVolume"
+                        name="business.averageMonthlyVolume"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.averageMonthlyVolume}
+                        value={formData.business?.averageMonthlyVolume || ''}
                         onChange={handleInputChange}
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.highTicketAmount"
+                        htmlFor="business.highTicketAmount"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         High Ticket Amount
                       </label>
                       <input
                         type="number"
-                        id="business?.highTicketAmount"
-                        name="business?.highTicketAmount"
+                        id="business.highTicketAmount"
+                        name="business.highTicketAmount"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.highTicketAmount}
+                        value={formData.business?.highTicketAmount || ''}
                         onChange={handleInputChange}
                       />
                     </div>
                     <div className="form-group">
                       <label
-                        htmlFor="business?.merchandiseServicesSold"
+                        htmlFor="business.merchandiseServicesSold"
                         className="block text-sm font-medium text-white dark:text-white mb-1"
                       >
                         Merchandise/Services
                       </label>
                       <input
                         type="text"
-                        id="business?.merchandiseServicesSold"
-                        name="business?.merchandiseServicesSold"
+                        id="business.merchandiseServicesSold"
+                        name="business.merchandiseServicesSold"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.business?.merchandiseServicesSold}
+                        value={formData.business?.merchandiseServicesSold || ''}
                         onChange={handleInputChange}
                       />
                     </div>
@@ -817,260 +1336,260 @@ const MerchantForm = () => {
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
-                          htmlFor="business?.percentOfBusinessTransactions?.cardSwiped"
+                          htmlFor="business.percentOfBusinessTransactions.cardSwiped"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Card Swiped (%)
                         </label>
                         <input
                           type="number"
-                          id="business?.percentOfBusinessTransactions?.cardSwiped"
-                          name="business?.percentOfBusinessTransactions?.cardSwiped"
+                          id="business.percentOfBusinessTransactions.cardSwiped"
+                          name="business.percentOfBusinessTransactions.cardSwiped"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.percentOfBusinessTransactions?.cardSwiped}
-                          onChange={handleInputChange}
-                          placeholder="%"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Keyed Card Present (%)
-                        </label>
-                        <input
-                          type="number"
-                          id="business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted"
-                          name="business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={
-                            formData.business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted
-                          }
-                          onChange={handleInputChange}
-                          placeholder="%"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.percentOfBusinessTransactions?.mailOrPhoneOrder"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Mail/Phone Order (%)
-                        </label>
-                        <input
-                          type="number"
-                          id="business?.percentOfBusinessTransactions?.mailOrPhoneOrder"
-                          name="business?.percentOfBusinessTransactions?.mailOrPhoneOrder"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.percentOfBusinessTransactions?.mailOrPhoneOrder}
-                          onChange={handleInputChange}
-                          placeholder="%"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.percentOfBusinessTransactions.internet"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Internet (%)
-                        </label>
-                        <input
-                          type="number"
-                          id="business?.percentOfBusinessTransactions.internet"
-                          name="business?.percentOfBusinessTransactions.internet"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.percentOfBusinessTransactions?.internet}
-                          onChange={handleInputChange}
-                          placeholder="%"
-                        />
-                      </div>
+                                                  value={formData.business?.percentOfBusinessTransactions?.cardSwiped || ''}
+                        onChange={handleInputChange}
+                        placeholder="%"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label
+                        htmlFor="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
+                      >
+                        Keyed Card Present (%)
+                      </label>
+                      <input
+                        type="number"
+                        id="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted"
+                        name="business.percentOfBusinessTransactions.keyedCardPresentNotImprinted"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                        value={
+                          formData.business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted || ''
+                        }
+                        onChange={handleInputChange}
+                        placeholder="%"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label
+                        htmlFor="business.percentOfBusinessTransactions.mailOrPhoneOrder"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
+                      >
+                        Mail/Phone Order (%)
+                      </label>
+                      <input
+                        type="number"
+                        id="business.percentOfBusinessTransactions.mailOrPhoneOrder"
+                        name="business.percentOfBusinessTransactions.mailOrPhoneOrder"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                        value={formData.business?.percentOfBusinessTransactions?.mailOrPhoneOrder || ''}
+                        onChange={handleInputChange}
+                        placeholder="%"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label
+                        htmlFor="business.percentOfBusinessTransactions.internet"
+                        className="block text-sm font-medium text-white dark:text-white mb-1"
+                      >
+                        Internet (%)
+                      </label>
+                      <input
+                        type="number"
+                        id="business.percentOfBusinessTransactions.internet"
+                        name="business.percentOfBusinessTransactions.internet"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                        value={formData.business?.percentOfBusinessTransactions?.internet || ''}
+                        onChange={handleInputChange}
+                        placeholder="%"
+                      />
+                    </div>
                     </div>
                   </div>
                   <div className="array-section space-y-4">
                     <div className="array-section-title text-lg font-semibold text-white dark:text-white">
                       Business Contact
                     </div>
-                    <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact.firstName"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          First Name
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact.firstName"
-                          name="business?.businessContact.firstName"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.firstName}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.lastName"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Last Name
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.lastName"
-                          name="business?.businessContact?.lastName"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.lastName}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.socialSecurityNumber"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          SSN
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.socialSecurityNumber"
-                          name="business?.businessContact?.socialSecurityNumber"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.socialSecurityNumber}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.dateOfBirth"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Date of Birth
-                        </label>
-                        <input
-                          type="date"
-                          id="business?.businessContact?.dateOfBirth"
-                          name="business?.businessContact?.dateOfBirth"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.dateOfBirth}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                    <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.street"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Street
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.street"
-                          name="business?.businessContact?.street"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.street}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.street2"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Street 2
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.street2"
-                          name="business?.businessContact?.street2"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.street2}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.zipCode"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Zip Code
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.zipCode"
-                          name="business?.businessContact?.zipCode"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.zipCode}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.city"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.city"
-                          name="business?.businessContact?.city"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.city}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.state"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          State
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.state"
-                          name="business?.businessContact?.state"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.state}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.phoneNumber"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Phone
-                        </label>
-                        <input
-                          type="text"
-                          id="business?.businessContact?.phoneNumber"
-                          name="business?.businessContact?.phoneNumber"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.phoneNumber}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business?.businessContact?.email"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          id="business?.businessContact?.email"
-                          name="business?.businessContact?.email"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessContact?.email}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
+                                            <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.firstName"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              First Name
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.firstName"
+                              name="business.businessContact.firstName"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.firstName || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.lastName"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Last Name
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.lastName"
+                              name="business.businessContact.lastName"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.lastName || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.socialSecurityNumber"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              SSN
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.socialSecurityNumber"
+                              name="business.businessContact.socialSecurityNumber"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.socialSecurityNumber || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.dateOfBirth"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Date of Birth
+                            </label>
+                            <input
+                              type="date"
+                              id="business.businessContact.dateOfBirth"
+                              name="business.businessContact.dateOfBirth"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.dateOfBirth || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                        </div>
+                                            <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.street"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Street
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.street"
+                              name="business.businessContact.street"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.street || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.street2"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Street 2
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.street2"
+                              name="business.businessContact.street2"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.street2 || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.zipCode"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Zip Code
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.zipCode"
+                              name="business.businessContact.zipCode"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.zipCode || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.city"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              City
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.city"
+                              name="business.businessContact.city"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.city || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.state"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              State
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.state"
+                              name="business.businessContact.state"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.state || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.phoneNumber"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Phone
+                            </label>
+                            <input
+                              type="text"
+                              id="business.businessContact.phoneNumber"
+                              name="business.businessContact.phoneNumber"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.phoneNumber || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor="business.businessContact.email"
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Email
+                            </label>
+                            <input
+                              type="email"
+                              id="business.businessContact.email"
+                              name="business.businessContact.email"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                              value={formData.business?.businessContact?.email || ''}
+                              onChange={handleInputChange}
+                            />
+                          </div>
+                        </div>
                   </div>
                 </div>
               )}
@@ -1079,34 +1598,46 @@ const MerchantForm = () => {
                   <div className="section-title text-2xl font-bold text-white dark:text-white mb-6">
                     Principals & Additional Details
                   </div>
+                  <div className="mb-6 p-4 bg-blue-900 border border-blue-700 rounded-md">
+                    <div className="flex items-center">
+                      <div className="text-blue-300 mr-2">👥</div>
+                      <span className="text-blue-200 text-sm">
+                        Principals are individuals with ownership or control over the business. Fill out all required fields marked with <span className="text-red-400">*</span>.
+                      </span>
+                    </div>
+                  </div>
                   <div id="principalsContainer">
+                    {console.log('🔍 Rendering principals:', formData.principals)}
                     {formData.principals?.map((principal, index) => (
-                      <div key={index} className="principal-section space-y-4">
-                        <div className="array-section-title text-lg font-semibold text-white dark:text-white">
-                          Principal {index + 1}
+                      <div key={index} className="principal-section space-y-4 mb-8 p-6 bg-gray-700 rounded-lg border border-gray-600">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="array-section-title text-lg font-semibold text-white dark:text-white">
+                            Principal {index + 1}
+                          </div>
+                          <button
+                            type="button"
+                            className="px-3 py-1 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors text-sm"
+                            onClick={() => removePrincipal(index)}
+                          >
+                            Remove
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="px-4 py-2 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors"
-                          onClick={() => removePrincipal(index)}
-                        >
-                          Remove
-                        </button>
                         <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div className="form-group">
                             <label
                               htmlFor={`principals[${index}].firstName`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              First Name
+                              First Name <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].firstName`}
                               name={`principals[${index}].firstName`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.firstName}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.firstName || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter first name"
                             />
                           </div>
                           <div className="form-group">
@@ -1114,15 +1645,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].lastName`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              Last Name
+                              Last Name <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].lastName`}
                               name={`principals[${index}].lastName`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.lastName}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.lastName || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter last name"
                             />
                           </div>
                           <div className="form-group">
@@ -1130,15 +1662,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].socialSecurityNumber`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              SSN
+                              SSN <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].socialSecurityNumber`}
                               name={`principals[${index}].socialSecurityNumber`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.socialSecurityNumber}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.socialSecurityNumber || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter SSN"
                             />
                           </div>
                           <div className="form-group">
@@ -1146,14 +1679,14 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].dateOfBirth`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              Date of Birth
+                              Date of Birth <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="date"
                               id={`principals[${index}].dateOfBirth`}
                               name={`principals[${index}].dateOfBirth`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.dateOfBirth}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.dateOfBirth || ''}
                               onChange={handleInputChange}
                             />
                           </div>
@@ -1168,9 +1701,10 @@ const MerchantForm = () => {
                               type="text"
                               id={`principals[${index}].title`}
                               name={`principals[${index}].title`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.title}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.title || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter title"
                             />
                           </div>
                           <div className="form-group">
@@ -1184,10 +1718,12 @@ const MerchantForm = () => {
                               type="number"
                               id={`principals[${index}].equityOwnershipPercentage`}
                               name={`principals[${index}].equityOwnershipPercentage`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.equityOwnershipPercentage}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.equityOwnershipPercentage || ''}
                               onChange={handleInputChange}
                               placeholder="%"
+                              min="0"
+                              max="100"
                             />
                           </div>
                         </div>
@@ -1197,15 +1733,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].street`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              Street
+                              Street <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].street`}
                               name={`principals[${index}].street`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.street}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.street || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter street address"
                             />
                           </div>
                           <div className="form-group">
@@ -1219,9 +1756,10 @@ const MerchantForm = () => {
                               type="text"
                               id={`principals[${index}].street2`}
                               name={`principals[${index}].street2`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.street2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.street2 || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter street 2 (optional)"
                             />
                           </div>
                           <div className="form-group">
@@ -1229,15 +1767,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].city`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              City
+                              City <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].city`}
                               name={`principals[${index}].city`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.city}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.city || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter city"
                             />
                           </div>
                           <div className="form-group">
@@ -1245,15 +1784,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].state`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              State
+                              State <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].state`}
                               name={`principals[${index}].state`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.state}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.state || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter state"
                             />
                           </div>
                           <div className="form-group">
@@ -1261,15 +1801,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].zipCode`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              Zip Code
+                              Zip Code <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].zipCode`}
                               name={`principals[${index}].zipCode`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.zipCode}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.zipCode || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter zip code"
                             />
                           </div>
                           <div className="form-group">
@@ -1277,15 +1818,16 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].phoneNumber`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              Phone
+                              Phone <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               id={`principals[${index}].phoneNumber`}
                               name={`principals[${index}].phoneNumber`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.phoneNumber}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.phoneNumber || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter phone number"
                             />
                           </div>
                           <div className="form-group">
@@ -1293,41 +1835,126 @@ const MerchantForm = () => {
                               htmlFor={`principals[${index}].email`}
                               className="block text-sm font-medium text-white dark:text-white mb-1"
                             >
-                              Email
+                              Email <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="email"
                               id={`principals[${index}].email`}
                               name={`principals[${index}].email`}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                              value={principal.email}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.email || ''}
                               onChange={handleInputChange}
+                              placeholder="Enter email address"
+                            />
+                          </div>
+                        </div>
+                        <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="form-group">
+                            <label
+                              htmlFor={`principals[${index}].isPersonalGuarantor`}
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Personal Guarantor
+                            </label>
+                            <input
+                              type="checkbox"
+                              id={`principals[${index}].isPersonalGuarantor`}
+                              name={`principals[${index}].isPersonalGuarantor`}
+                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                              checked={principal.isPersonalGuarantor || false}
+                              onChange={(e) => {
+                                const newPrincipals = [...formData.principals];
+                                newPrincipals[index] = {
+                                  ...newPrincipals[index],
+                                  isPersonalGuarantor: e.target.checked
+                                };
+                                setFormData(prev => ({
+                                  ...prev,
+                                  principals: newPrincipals
+                                }));
+                                setHasUnsavedChanges(true);
+                              }}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor={`principals[${index}].driverLicenseNumber`}
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Driver License Number
+                            </label>
+                            <input
+                              type="text"
+                              id={`principals[${index}].driverLicenseNumber`}
+                              name={`principals[${index}].driverLicenseNumber`}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.driverLicenseNumber || ''}
+                              onChange={handleInputChange}
+                              placeholder="Enter driver license number"
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label
+                              htmlFor={`principals[${index}].driverLicenseIssuedState`}
+                              className="block text-sm font-medium text-white dark:text-white mb-1"
+                            >
+                              Driver License State
+                            </label>
+                            <input
+                              type="text"
+                              id={`principals[${index}].driverLicenseIssuedState`}
+                              name={`principals[${index}].driverLicenseIssuedState`}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400 hover:border-blue-400 transition-colors"
+                              value={principal.driverLicenseIssuedState || ''}
+                              onChange={handleInputChange}
+                              placeholder="Enter driver license state"
                             />
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors"
-                    onClick={() => addPrincipal()}
-                  >
-                    ➕ Add Principal
-                  </button>
+                  <div className="mt-6 text-center">
+                    <button
+                      type="button"
+                      className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors flex items-center justify-center mx-auto"
+                      onClick={() => addPrincipal()}
+                    >
+                      <span className="mr-2">➕</span>
+                      Add Another Principal
+                    </button>
+                    <p className="text-gray-400 text-sm mt-2">
+                      Add additional principals if there are multiple owners or controllers of the business
+                    </p>
+                  </div>
+                  
+                  <div className="mt-8 mb-6">
+                    <div className="section-title text-xl font-bold text-white dark:text-white mb-4">
+                      Additional Business Details
+                    </div>
+                    <div className="mb-4 p-4 bg-blue-900 border border-blue-700 rounded-md">
+                      <div className="flex items-center">
+                        <div className="text-blue-300 mr-2">⚙️</div>
+                        <span className="text-blue-200 text-sm">
+                          Complete these additional business configuration details.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="form-group">
                     <label
-                      htmlFor="business?.statementDeliveryMethod"
+                      htmlFor="statementDeliveryMethod"
                       className="block text-sm font-medium text-white dark:text-white mb-1"
                     >
                       Statement Delivery Method
                     </label>
                     <input
                       type="text"
-                      id="business?.statementDeliveryMethod"
-                      name="business?.statementDeliveryMethod"
+                      id="statementDeliveryMethod"
+                      name="statementDeliveryMethod"
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                      value={formData.business?.statementDeliveryMethod}
+                      value={formData.statementDeliveryMethod || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -1338,65 +1965,65 @@ const MerchantForm = () => {
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.dba.street"
+                          htmlFor="business.businessAddress.dba.street"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA Street
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.dba.street"
-                          name="business?.businessAddress.dba.street"
+                          id="business.businessAddress.dba.street"
+                          name="business.businessAddress.dba.street"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.dba.street}
+                          value={formData.business?.businessAddress?.dba?.street || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.dba.city"
+                          htmlFor="business.businessAddress.dba.city"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA City
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.dba.city"
-                          name="business?.businessAddress.dba.city"
+                          id="business.businessAddress.dba.city"
+                          name="business.businessAddress.dba.city"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.dba.city}
+                          value={formData.business?.businessAddress?.dba?.city || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.dba.state"
+                          htmlFor="business.businessAddress.dba.state"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA State
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.dba.state"
-                          name="business?.businessAddress.dba.state"
+                          id="business.businessAddress.dba.state"
+                          name="business.businessAddress.dba.state"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.dba.state}
+                          value={formData.business?.businessAddress?.dba?.state || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.dba.zipCode"
+                          htmlFor="business.businessAddress.dba.zipCode"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           DBA Zip
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.dba.zipCode"
-                          name="business?.businessAddress.dba.zipCode"
+                          id="business.businessAddress.dba.zipCode"
+                          name="business.businessAddress.dba.zipCode"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.dba.zipCode}
+                          value={formData.business?.businessAddress?.dba?.zipCode || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1404,65 +2031,65 @@ const MerchantForm = () => {
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.corporate.street"
+                          htmlFor="business.businessAddress.corporate.street"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate Street
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.corporate.street"
-                          name="business?.businessAddress.corporate.street"
+                          id="business.businessAddress.corporate.street"
+                          name="business.businessAddress.corporate.street"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.corporate.street}
+                          value={formData.business?.businessAddress?.corporate?.street || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.corporate.city"
+                          htmlFor="business.businessAddress.corporate.city"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate City
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.corporate.city"
-                          name="business?.businessAddress.corporate.city"
+                          id="business.businessAddress.corporate.city"
+                          name="business.businessAddress.corporate.city"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.corporate.city}
+                          value={formData.business?.businessAddress?.corporate?.city || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.corporate.state"
+                          htmlFor="business.businessAddress.corporate.state"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate State
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.corporate.state"
-                          name="business?.businessAddress.corporate.state"
+                          id="business.businessAddress.corporate.state"
+                          name="business.businessAddress.corporate.state"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.corporate.state}
+                          value={formData.business?.businessAddress?.corporate?.state || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.corporate.zipCode"
+                          htmlFor="business.businessAddress.corporate.zipCode"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Corporate Zip
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.corporate.zipCode"
-                          name="business?.businessAddress.corporate.zipCode"
+                          id="business.businessAddress.corporate.zipCode"
+                          name="business.businessAddress.corporate.zipCode"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.corporate.zipCode}
+                          value={formData.business?.businessAddress?.corporate?.zipCode || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1470,65 +2097,65 @@ const MerchantForm = () => {
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.shipTo.street"
+                          htmlFor="business.businessAddress.shipTo.street"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo Street
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.shipTo.street"
-                          name="business?.businessAddress.shipTo.street"
+                          id="business.businessAddress.shipTo.street"
+                          name="business.businessAddress.shipTo.street"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.shipTo.street}
+                          value={formData.business?.businessAddress?.shipTo?.street || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.shipTo.city"
+                          htmlFor="business.businessAddress.shipTo.city"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo City
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.shipTo.city"
-                          name="business?.businessAddress.shipTo.city"
+                          id="business.businessAddress.shipTo.city"
+                          name="business.businessAddress.shipTo.city"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.shipTo.city}
+                          value={formData.business?.businessAddress?.shipTo?.city || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.shipTo.state"
+                          htmlFor="business.businessAddress.shipTo.state"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo State
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.shipTo.state"
-                          name="business?.businessAddress.shipTo.state"
+                          id="business.businessAddress.shipTo.state"
+                          name="business.businessAddress.shipTo.state"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.shipTo.state}
+                          value={formData.business?.businessAddress?.shipTo?.state || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.businessAddress.shipTo.zipCode"
+                          htmlFor="business.businessAddress.shipTo.zipCode"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           ShipTo Zip
                         </label>
                         <input
                           type="text"
-                          id="business?.businessAddress.shipTo.zipCode"
-                          name="business?.businessAddress.shipTo.zipCode"
+                          id="business.businessAddress.shipTo.zipCode"
+                          name="business.businessAddress.shipTo.zipCode"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.businessAddress.shipTo.zipCode}
+                          value={formData.business?.businessAddress?.shipTo?.zipCode || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1541,49 +2168,49 @@ const MerchantForm = () => {
                     <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="form-group">
                         <label
-                          htmlFor="business?.websites[0].url"
+                          htmlFor="business.websites.0.url"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Website URL
                         </label>
                         <input
                           type="text"
-                          id="business?.websites[0].url"
-                          name="business?.websites[0].url"
+                          id="business.websites.0.url"
+                          name="business.websites.0.url"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.websites[0].url}
+                          value={formData.business?.websites?.[0]?.url || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.websites[0].websiteCustomerServiceEmail"
+                          htmlFor="business.websites.0.websiteCustomerServiceEmail"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Customer Service Email
                         </label>
                         <input
                           type="email"
-                          id="business?.websites[0].websiteCustomerServiceEmail"
-                          name="business?.websites[0].websiteCustomerServiceEmail"
+                          id="business.websites.0.websiteCustomerServiceEmail"
+                          name="business.websites.0.websiteCustomerServiceEmail"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.websites[0].websiteCustomerServiceEmail}
+                          value={formData.business?.websites?.[0]?.websiteCustomerServiceEmail || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.websites[0].websiteCustomerServicePhoneNumber"
+                          htmlFor="business.websites.0.websiteCustomerServicePhoneNumber"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           Customer Service Phone
                         </label>
                         <input
                           type="text"
-                          id="business?.websites[0].websiteCustomerServicePhoneNumber"
-                          name="business?.websites[0].websiteCustomerServicePhoneNumber"
+                          id="business.websites.0.websiteCustomerServicePhoneNumber"
+                          name="business.websites.0.websiteCustomerServicePhoneNumber"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.websites[0].websiteCustomerServicePhoneNumber}
+                          value={formData.business?.websites?.[0]?.websiteCustomerServicePhoneNumber || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1596,33 +2223,127 @@ const MerchantForm = () => {
                     <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="form-group">
                         <label
-                          htmlFor="business?.ebt?.ebtType"
+                          htmlFor="business.ebt.ebtType"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           EBT Type
                         </label>
                         <input
                           type="text"
-                          id="business?.ebt?.ebtType"
-                          name="business?.ebt?.ebtType"
+                          id="business.ebt.ebtType"
+                          name="business.ebt.ebtType"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.ebt?.ebtType}
+                          value={formData.business?.ebt?.ebtType || ''}
                           onChange={handleInputChange}
                         />
                       </div>
                       <div className="form-group">
                         <label
-                          htmlFor="business?.ebt?.ebtAccountNumber"
+                          htmlFor="business.ebt.ebtAccountNumber"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
                         >
                           EBT Account Number
                         </label>
                         <input
                           type="text"
-                          id="business?.ebt?.ebtAccountNumber"
-                          name="business?.ebt?.ebtAccountNumber"
+                          id="business.ebt.ebtAccountNumber"
+                          name="business.ebt.ebtAccountNumber"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.ebt?.ebtAccountNumber}
+                          value={formData.business?.ebt?.ebtAccountNumber || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="array-section space-y-4">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
+                      Website Information
+                    </div>
+                    <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="form-group">
+                        <label
+                          htmlFor="business.websites.0.url"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
+                        >
+                          Website URL
+                        </label>
+                        <input
+                          type="text"
+                          id="business.websites.0.url"
+                          name="business.websites.0.url"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                          value={formData.business?.websites?.[0]?.url || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label
+                          htmlFor="business.websites.0.websiteCustomerServiceEmail"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
+                        >
+                          Customer Service Email
+                        </label>
+                        <input
+                          type="email"
+                          id="business.websites.0.websiteCustomerServiceEmail"
+                          name="business.websites.0.websiteCustomerServiceEmail"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                          value={formData.business?.websites?.[0]?.websiteCustomerServiceEmail || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label
+                          htmlFor="business.websites.0.websiteCustomerServicePhoneNumber"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
+                        >
+                          Customer Service Phone
+                        </label>
+                        <input
+                          type="text"
+                          id="business.websites.0.websiteCustomerServicePhoneNumber"
+                          name="business.websites.0.websiteCustomerServicePhoneNumber"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                          value={formData.business?.websites?.[0]?.websiteCustomerServicePhoneNumber || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="array-section space-y-4">
+                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
+                      EBT Services
+                    </div>
+                    <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="form-group">
+                        <label
+                          htmlFor="business.ebt.ebtType"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
+                        >
+                          EBT Type
+                        </label>
+                        <input
+                          type="text"
+                          id="business.ebt.ebtType"
+                          name="business.ebt.ebtType"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                          value={formData.business?.ebt?.ebtType || ''}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label
+                          htmlFor="business.ebt.ebtAccountNumber"
+                          className="block text-sm font-medium text-white dark:text-white mb-1"
+                        >
+                          EBT Account Number
+                        </label>
+                        <input
+                          type="text"
+                          id="business.ebt.ebtAccountNumber"
+                          name="business.ebt.ebtAccountNumber"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                          value={formData.business?.ebt?.ebtAccountNumber || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1645,7 +2366,7 @@ const MerchantForm = () => {
                           id="bankAccount.abaRouting"
                           name="bankAccount.abaRouting"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.bankAccount?.abaRouting}
+                          value={formData.bankAccount?.abaRouting || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1661,7 +2382,7 @@ const MerchantForm = () => {
                           id="bankAccount.accountType"
                           name="bankAccount.accountType"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.bankAccount?.accountType}
+                          value={formData.bankAccount?.accountType || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1677,7 +2398,7 @@ const MerchantForm = () => {
                           id="bankAccount.demandDepositAccount"
                           name="bankAccount.demandDepositAccount"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.bankAccount?.demandDepositAccount}
+                          value={formData.bankAccount?.demandDepositAccount || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -1706,42 +2427,105 @@ const MerchantForm = () => {
                 ← Previous
               </button>
               <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={saveForm}
-                  disabled={isLoading}
-                  className={`px-6 py-3 rounded-md font-medium flex items-center justify-center ${isLoading
-                      ? 'bg-blue-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 transition-colors'
-                    }`}
-                >
-                  {isLoading ? (
-                    <>
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Application'
-                  )}
-                </button>
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={saveForm}
+                    disabled={isLoading}
+                    className={`px-6 py-3 rounded-md font-medium flex items-center justify-center ${isLoading
+                        ? 'bg-blue-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 transition-colors'
+                      }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Application'
+                    )}
+                  </button>
+                  <p className={`text-xs mt-2 text-center ${hasUnsavedChanges ? 'text-yellow-400' : 'text-gray-400'}`}>
+                    {hasUnsavedChanges ? '⚠️ You have unsaved changes' : 'Save frequently to preserve your work'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.externalKey) {
+                        localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
+                        setSuccessMessage('Form data saved to browser!');
+                        setLastSaved(new Date());
+                        setHasUnsavedChanges(false);
+                      }
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 mt-1 mr-2"
+                    title="Save form data to browser for backup"
+                  >
+                    💾 Save to Browser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.externalKey) {
+                        const savedData = localStorage.getItem(`formData_${formData.externalKey}`);
+                        if (savedData) {
+                          try {
+                            const parsedData = JSON.parse(savedData);
+                            setFormData(parsedData);
+                            setSuccessMessage('Form data restored from browser!');
+                            setHasUnsavedChanges(false);
+                          } catch (error) {
+                            setSuccessMessage('Error restoring form data');
+                          }
+                        } else {
+                          setSuccessMessage('No saved data found');
+                        }
+                      }
+                    }}
+                    className="text-xs text-green-400 hover:text-green-300 mt-1 mr-2"
+                    title="Restore form data from browser"
+                  >
+                    🔄 Restore from Browser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (formData.externalKey) {
+                        try {
+                          const summary = await getApplicationDataSummary(formData.externalKey);
+                          console.log('📊 MongoDB Data Summary:', summary);
+                          setSuccessMessage('Data summary logged to console!');
+                          setTimeout(() => setSuccessMessage(''), 3000);
+                        } catch (error) {
+                          setSuccessMessage('Error getting data summary');
+                        }
+                      }
+                    }}
+                    className="text-xs text-purple-400 hover:text-purple-300 mt-1"
+                    title="Get MongoDB data summary"
+                  >
+                    📊 MongoDB Summary
+                  </button>
+                </div>
 
                 {currentStep < 3 ? (
                   <button

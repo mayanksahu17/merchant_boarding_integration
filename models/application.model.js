@@ -103,10 +103,6 @@ const ebtSchema = new mongoose.Schema({
   ebtAccountNumber: String
 });
 
-const businessServicesRequestedSchema = new mongoose.Schema({
-  ebt: [ebtSchema]
-});
-
 const businessSchema = new mongoose.Schema({
   corporateName: String,
   dbaName: String,
@@ -116,21 +112,19 @@ const businessSchema = new mongoose.Schema({
   mcc: String,
   phone: String,
   email: String,
-  ebt: String,
-  websites: [websiteSchema],
   averageTicketAmount: Number,
   averageMonthlyVolume: Number,
   highTicketAmount: Number,
   merchandiseServicesSold: String,
   percentOfBusinessTransactions: percentOfBusinessTransactionsSchema,
   businessContact: businessContactSchema,
-  statementDeliveryMethod: String,
   businessAddress: {
     dba: addressSchema,
     corporate: addressSchema,
     shipTo: addressSchema
   },
-  businessServicesRequested: [businessServicesRequestedSchema]
+  websites: [websiteSchema],
+  ebt: ebtSchema
 });
 
 const equipmentSchema = new mongoose.Schema({
@@ -162,14 +156,14 @@ const applicationSchema = new mongoose.Schema({
   agent: Number,
   applicationName: String,
   externalKey: { type: String, unique: true },
-  applicationEmail: { type: String, required: true }, 
   plan: planSchema,
   shipping: shippingSchema,
   principals: [principalSchema],
   business: businessSchema,
   bankAccount: bankAccountSchema,
+  statementDeliveryMethod: String,
   documents: [documentSchema],
-  merchantLink: String,  // Add merchantLink field
+  merchantLink: String,
   status: { type: String, default: 'draft' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

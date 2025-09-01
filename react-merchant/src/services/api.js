@@ -1,7 +1,7 @@
 import axios from 'axios';
 
- const API_BASE_URL = 'https://api.merchant.zifypay.com/api';
-//  const API_BASE_URL = 'http://localhost:8000/api'; 
+//  const API_BASE_URL = 'https://api.merchant.zifypay.com/api';
+ const API_BASE_URL = 'http://localhost:8000/api'; 
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -90,6 +90,15 @@ export const getApplication = async (externalKey) => {
     throw error.response?.data?.message || 'Failed to get application';
   }
 };
+
+export const getApplicationDataSummary = async (externalKey) => {
+  try {
+    const response = await api.get(`/applications/${externalKey}/data-summary`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Failed to get application data summary';
+  }
+};
 export const validateApplication = async (externalKey) => {
   try {
     const response = await api.get(`/applications/validate/${externalKey}`);
@@ -117,6 +126,15 @@ export const updateApplication = async (externalKey, formData) => {
     return response.data;
   } catch (error) {
     throw error.response?.data?.message || 'Failed to update application';
+  }
+};
+
+export const saveApplication = async (externalKey, formData) => {
+  try {
+    const response = await api.post(`/applications/${externalKey}/save`, formData);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Failed to save application';
   }
 };
 

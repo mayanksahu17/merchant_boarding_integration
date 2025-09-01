@@ -15,7 +15,63 @@ const createApplication = async (applicationData) => {
 };
 
 const getApplicationByExternalKey = async (externalKey) => {
-  return await Application.findOne({ externalKey });
+  const application = await Application.findOne({ externalKey });
+  
+  if (application) {
+    // Log comprehensive data summary
+    console.log(`📊 Data summary for ${externalKey}:`, {
+      basicInfo: {
+        agent: application.agent,
+        applicationName: application.applicationName,
+        externalKey: application.externalKey,
+        status: application.status,
+        createdAt: application.createdAt,
+        updatedAt: application.updatedAt
+      },
+      business: application.business ? {
+        corporateName: application.business.corporateName,
+        dbaName: application.business.dbaName,
+        businessType: application.business.businessType,
+        federalTaxIdNumber: application.business.federalTaxIdNumber,
+        mcc: application.business.mcc,
+        phone: application.business.phone,
+        email: application.business.email,
+        averageTicketAmount: application.business.averageTicketAmount,
+        averageMonthlyVolume: application.business.averageMonthlyVolume,
+        hasBusinessContact: !!application.business.businessContact,
+        hasBusinessAddress: !!application.business.businessAddress,
+        hasWebsites: !!application.business.websites,
+        hasEbt: !!application.business.ebt
+      } : null,
+      plan: application.plan ? {
+        planId: application.plan.planId,
+        equipmentCostToMerchant: application.plan.equipmentCostToMerchant,
+        accountSetupFee: application.plan.accountSetupFee,
+        discountFrequency: application.plan.discountFrequency,
+        equipmentCount: application.plan.equipment ? application.plan.equipment.length : 0
+      } : null,
+      shipping: application.shipping ? {
+        shippingDestination: application.shipping.shippingDestination,
+        deliveryMethod: application.shipping.deliveryMethod
+      } : null,
+      principals: application.principals ? {
+        count: application.principals.length,
+        hasPersonalGuarantor: application.principals.some(p => p.isPersonalGuarantor)
+      } : null,
+      bankAccount: application.bankAccount ? {
+        abaRouting: application.bankAccount.abaRouting,
+        accountType: application.bankAccount.accountType,
+        demandDepositAccount: application.bankAccount.demandDepositAccount
+      } : null,
+      statementDeliveryMethod: application.statementDeliveryMethod,
+      documents: application.documents ? {
+        count: application.documents.length,
+        types: application.documents.map(d => d.type)
+      } : null
+    });
+  }
+  
+  return application;
 };
 
 const getAllApplications = async () => {
@@ -28,7 +84,24 @@ const updateApplicationByExternalKey = async (externalKey, updateData) => {
     throw new Error('Application not found');
   }
 
-  // If documents are being updated, merge them with existing documents
+  console.log('Updating application with data:', JSON.stringify(updateData, null, 2));
+  
+  // Check if there's a schema mismatch with EBT
+  if (application.business && application.business.ebt) {
+    console.log('🔍 Checking existing EBT schema...');
+    console.log('Existing EBT type:', typeof application.business.ebt);
+    console.log('Existing EBT value:', JSON.stringify(application.business.ebt, null, 2));
+    
+    // If EBT is not an object, reset it to proper structure
+    if (typeof application.business.ebt !== 'object' || Array.isArray(application.business.ebt)) {
+      console.log('⚠️ Resetting invalid EBT schema to proper structure');
+      application.business.ebt = { ebtType: '', ebtAccountNumber: '' };
+      // Mark as modified to ensure it gets saved
+      application.markModified('business.ebt');
+    }
+  }
+
+  // Handle documents separately to avoid overwriting
   if (updateData.documents) {
     const existingDocTypes = application.documents.map(doc => doc.type);
     const newDocs = updateData.documents.filter(doc => !existingDocTypes.includes(doc.type));
@@ -36,9 +109,178 @@ const updateApplicationByExternalKey = async (externalKey, updateData) => {
     delete updateData.documents;
   }
 
-  // Update other fields
-  Object.assign(application, updateData);
-  return await application.save();
+  // Deep merge all fields to ensure no data is lost
+  const deepMerge = (target, source) => {
+    for (const key in source) {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        if (!target[key]) target[key] = {};
+        deepMerge(target[key], source[key]);
+      } else if (Array.isArray(source[key])) {
+        // For arrays, replace completely to avoid duplicates
+        target[key] = [...source[key]];
+      } else {
+        target[key] = source[key];
+      }
+    }
+  };
+
+  // Ensure proper EBT structure
+  if (updateData.business && updateData.business.ebt) {
+    console.log('🔧 Processing EBT data:', JSON.stringify(updateData.business.ebt, null, 2));
+    
+    // Ensure ebt is properly structured as an object
+    if (typeof updateData.business.ebt === 'string') {
+      console.log('⚠️ EBT is string, converting to object');
+      updateData.business.ebt = { ebtType: updateData.business.ebt, ebtAccountNumber: '' };
+    }
+    
+    // Ensure ebt object has required fields
+    if (!updateData.business.ebt.ebtType) updateData.business.ebt.ebtType = '';
+    if (!updateData.business.ebt.ebtAccountNumber) updateData.business.ebt.ebtAccountNumber = '';
+    
+    console.log('✅ EBT data processed:', JSON.stringify(updateData.business.ebt, null, 2));
+  }
+
+  // Deep merge the update data
+  deepMerge(application, updateData);
+  
+  // Ensure required fields are set
+  application.updatedAt = new Date();
+  
+  // Additional validation for EBT structure
+  if (application.business && application.business.ebt) {
+    console.log('🔍 Validating EBT structure after merge...');
+    console.log('EBT type:', typeof application.business.ebt);
+    console.log('EBT value:', JSON.stringify(application.business.ebt, null, 2));
+    
+    // Force proper EBT structure
+    if (typeof application.business.ebt !== 'object' || Array.isArray(application.business.ebt)) {
+      console.log('⚠️ Fixing invalid EBT structure');
+      application.business.ebt = { ebtType: '', ebtAccountNumber: '' };
+    }
+    
+    // Ensure ebt object has required fields
+    if (!application.business.ebt.ebtType) application.business.ebt.ebtType = '';
+    if (!application.business.ebt.ebtAccountNumber) application.business.ebt.ebtAccountNumber = '';
+    
+    console.log('✅ EBT structure validated:', JSON.stringify(application.business.ebt, null, 2));
+  }
+  
+  // Validate that all expected fields are present
+  const validateDataCompleteness = (app) => {
+    const validation = {
+      hasAgent: !!app.agent,
+      hasApplicationName: !!app.applicationName,
+      hasExternalKey: !!app.externalKey,
+      hasPlan: !!app.plan && !!app.plan.planId,
+      hasShipping: !!app.shipping && !!app.shipping.shippingDestination,
+      hasBusiness: !!app.business && !!app.business.corporateName,
+      hasPrincipals: !!app.principals && app.principals.length > 0,
+      hasBankAccount: !!app.bankAccount && !!app.bankAccount.abaRouting,
+      hasStatementDelivery: !!app.statementDeliveryMethod,
+      hasEbt: !!app.business?.ebt && typeof app.business.ebt === 'object'
+    };
+    
+    console.log('📊 Data completeness validation:', validation);
+    return validation;
+  };
+  
+  const dataValidation = validateDataCompleteness(application);
+  console.log('Final application data before save:', JSON.stringify(application, null, 2));
+  
+  try {
+    return await application.save();
+  } catch (error) {
+    console.error('❌ Save error:', error);
+    console.error('❌ Error details:', error.message);
+    if (error.errors) {
+      console.error('❌ Validation errors:', JSON.stringify(error.errors, null, 2));
+    }
+    throw error;
+  }
+};
+
+// Fallback method to handle schema conflicts
+const updateApplicationWithSchemaFix = async (externalKey, updateData) => {
+  try {
+    // First try the normal update
+    return await updateApplicationByExternalKey(externalKey, updateData);
+  } catch (error) {
+    console.log('⚠️ Normal update failed, trying schema fix approach...');
+    
+    // If there's a schema validation error, try to fix it
+    if (error.message && error.message.includes('Cast to string failed')) {
+      console.log('🔧 Attempting to fix schema conflict...');
+      
+      // Use findOneAndUpdate with proper schema structure
+      const updatedApp = await Application.findOneAndUpdate(
+        { externalKey },
+        { 
+          $set: {
+            'business.ebt': { ebtType: '', ebtAccountNumber: '' },
+            updatedAt: new Date()
+          }
+        },
+        { new: true, runValidators: true }
+      );
+      
+      if (updatedApp) {
+        console.log('✅ Schema conflict resolved, now updating with full data...');
+        // Now try to update with the full data
+        return await updateApplicationByExternalKey(externalKey, updateData);
+      }
+    }
+    
+    // If all else fails, throw the original error
+    throw error;
+  }
+};
+
+// Nuclear option: Complete schema reset for problematic applications
+const resetApplicationSchema = async (externalKey) => {
+  console.log('🚨 Performing complete schema reset for application:', externalKey);
+  
+  try {
+    // Get the current application data
+    const currentApp = await Application.findOne({ externalKey });
+    if (!currentApp) {
+      throw new Error('Application not found');
+    }
+    
+    // Create a new application with proper schema
+    const newApplication = new Application({
+      externalKey: currentApp.externalKey,
+      applicationEmail: currentApp.applicationEmail || 'temp@example.com',
+      agent: currentApp.agent || 96194,
+      applicationName: currentApp.applicationName || '',
+      plan: currentApp.plan || {},
+      shipping: currentApp.shipping || {},
+      principals: currentApp.principals || [],
+      business: {
+        ...currentApp.business,
+        ebt: { ebtType: '', ebtAccountNumber: '' } // Force proper EBT structure
+      },
+      bankAccount: currentApp.bankAccount || {},
+      statementDeliveryMethod: currentApp.statementDeliveryMethod || 'electronic',
+      documents: currentApp.documents || [],
+      merchantLink: currentApp.merchantLink || '',
+      status: currentApp.status || 'draft',
+      createdAt: currentApp.createdAt,
+      updatedAt: new Date()
+    });
+    
+    // Delete the old application
+    await Application.deleteOne({ externalKey });
+    
+    // Save the new one
+    const savedApp = await newApplication.save();
+    console.log('✅ Schema reset completed successfully');
+    
+    return savedApp;
+  } catch (error) {
+    console.error('❌ Schema reset failed:', error);
+    throw error;
+  }
 };
 
 const changeApplicationStatus = async (externalKey, status) => {
@@ -286,6 +528,8 @@ module.exports = {
   getApplicationByExternalKey,
   getAllApplications,
   updateApplicationByExternalKey,
+  updateApplicationWithSchemaFix,
+  resetApplicationSchema,
   changeApplicationStatus,
   deleteApplication,
   generateMerchantLink,

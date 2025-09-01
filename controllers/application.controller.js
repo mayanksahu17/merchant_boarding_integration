@@ -63,25 +63,83 @@ exports.getApplication = async (req, res) => {
   try {
     const { externalKey } = req.params;
     
+    console.log(`🔍 Retrieving application data for: ${externalKey}`);
+    
     // First try to get from MongoDB
     const mongoApplication = await applicationService.getApplicationByExternalKey(externalKey);
     
-    // Then get from PaymentsHub API
-    const response = await axios.get(
-      `${process.env.API_ENDPOINT}/enroll/application/key/${externalKey}`,
-      {
-        headers: {
-          Authorization: `Bearer ${req.accessToken}`,
-        },
-      }
-    );
+    if (mongoApplication) {
+      console.log(`✅ MongoDB data found for ${externalKey}:`, {
+        hasBusiness: !!mongoApplication.business,
+        hasPrincipals: !!mongoApplication.principals,
+        hasPlan: !!mongoApplication.plan,
+        hasBankAccount: !!mongoApplication.bankAccount,
+        hasShipping: !!mongoApplication.shipping,
+        hasStatementDelivery: !!mongoApplication.statementDeliveryMethod
+      });
+    } else {
+      console.log(`❌ No MongoDB data found for ${externalKey}`);
+    }
     
-    res.json({
+    // Try to get from PaymentsHub API, but don't fail if it's not available
+    let paymentsHubResponse = null;
+    try {
+      const response = await axios.get(
+        `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/application/key/${externalKey}`,
+        {
+          headers: {
+            Authorization: `Bearer ${req.accessToken}`,
+          },
+        }
+      );
+      paymentsHubResponse = response.data;
+      console.log(`✅ PaymentsHub data retrieved for ${externalKey}`);
+    } catch (paymentsHubError) {
+      console.log(`⚠️ PaymentsHub API not available for ${externalKey}, using MongoDB data only`);
+      // Continue with MongoDB data only
+    }
+    
+    // Ensure all required fields are present in the response
+    const responseData = {
       mongoApplication,
-      paymentsHubResponse: response.data
-    });
+      paymentsHubResponse,
+      status: 'success',
+      retrievedAt: new Date().toISOString()
+    };
+    
+    console.log(`📤 Sending response for ${externalKey} with status: ${responseData.status}`);
+    
+    res.json(responseData);
   } catch (error) {
-    handleApiError(res, error);
+    console.error(`❌ Error getting application ${req.params.externalKey}:`, error);
+    
+    // If MongoDB fails, try to return PaymentsHub data if available
+    try {
+      const response = await axios.get(
+        `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/application/key/${req.params.externalKey}`,
+        {
+          headers: {
+            Authorization: `Bearer ${req.accessToken}`,
+          },
+        }
+      );
+      
+      res.json({
+        mongoApplication: null,
+        paymentsHubResponse: response.data,
+        status: 'partial',
+        message: 'MongoDB data unavailable, using PaymentsHub data',
+        retrievedAt: new Date().toISOString()
+      });
+    } catch (paymentsHubError) {
+      // Both failed
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to retrieve application data',
+        error: error.message,
+        retrievedAt: new Date().toISOString()
+      });
+    }
   }
 };
 
@@ -171,12 +229,14 @@ exports.submitToUnderwriting = async (req, res) => {
   try {
     const { externalKey } = req.params;
     
+    console.log(`🚀 Submitting application ${externalKey} to underwriting...`);
+    
     // This will validate bank documents and update status
     const updatedApplication = await applicationService.submitToUnderwriting(externalKey);
     
     // Call PaymentsHub API
     const response = await axios.put(
-      `${process.env.API_ENDPOINT}/enroll/application/submit/${externalKey}`,
+      `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/application/submit/${externalKey}`,
       {},
       {
         headers: {
@@ -185,12 +245,47 @@ exports.submitToUnderwriting = async (req, res) => {
       }
     );
     
+    console.log(`✅ Application ${externalKey} submitted successfully`);
+    
     res.json({
+      status: 'success',
+      message: 'Application submitted to underwriting successfully',
       mongoApplication: updatedApplication,
       paymentsHubResponse: response.data
     });
   } catch (error) {
-    handleApiError(res, error);
+    console.error(`❌ Error submitting application ${req.params.externalKey}:`, error);
+    
+    // Handle different types of errors
+    if (error.response) {
+      // PaymentsHub API error
+      const errorData = error.response.data;
+      res.status(error.response.status).json({
+        status: 'error',
+        message: 'Failed to submit application to PaymentsHub',
+        error: errorData,
+        mongoApplication: null,
+        paymentsHubResponse: null
+      });
+    } else if (error.request) {
+      // Network error
+      res.status(500).json({
+        status: 'error',
+        message: 'Network error - could not reach PaymentsHub',
+        error: 'No response received from server',
+        mongoApplication: null,
+        paymentsHubResponse: null
+      });
+    } else {
+      // Other error (like MongoDB validation)
+      res.status(500).json({
+        status: 'error',
+        message: error.message || 'Failed to submit application',
+        error: error.message,
+        mongoApplication: null,
+        paymentsHubResponse: null
+      });
+    }
   }
 };
 
@@ -439,5 +534,172 @@ exports.getApplicationPDF = async (req, res) => {
     } else {
       handleApiError(res, error);
     }
+  }
+};
+
+exports.saveApplication = async (req, res) => {
+  try {
+    const { externalKey } = req.params;
+    
+    console.log(`💾 Saving application ${externalKey} to MongoDB...`);
+    console.log('📝 Form data received:', {
+      hasBusiness: !!req.body.business,
+      hasPrincipals: !!req.body.principals,
+      hasPlan: !!req.body.plan,
+      hasBankAccount: !!req.body.bankAccount,
+      hasShipping: !!req.body.shipping,
+      hasStatementDelivery: !!req.body.statementDeliveryMethod,
+      businessFields: req.body.business ? Object.keys(req.body.business) : [],
+      principalCount: req.body.principals ? req.body.principals.length : 0
+    });
+
+    // Detailed EBT logging
+    if (req.body.business && req.body.business.ebt) {
+      console.log('🔍 EBT data received:', {
+        type: typeof req.body.business.ebt,
+        value: JSON.stringify(req.body.business.ebt, null, 2),
+        hasEbtType: !!req.body.business.ebt.ebtType,
+        hasEbtAccountNumber: !!req.body.business.ebt.ebtAccountNumber
+      });
+    }
+
+    // Only save to MongoDB - no PaymentsHub API call
+    let savedApplication;
+    try {
+      savedApplication = await applicationService.updateApplicationByExternalKey(externalKey, req.body);
+    } catch (error) {
+      console.log('⚠️ Primary save method failed, trying fallback...');
+      if (error.message && error.message.includes('Cast to string failed')) {
+        try {
+          savedApplication = await applicationService.updateApplicationWithSchemaFix(externalKey, req.body);
+        } catch (fallbackError) {
+          console.log('⚠️ Fallback method failed, trying schema reset...');
+          if (fallbackError.message && fallbackError.message.includes('Cast to string failed')) {
+            console.log('🚨 Using nuclear option: complete schema reset');
+            savedApplication = await applicationService.resetApplicationSchema(externalKey);
+            // After reset, try to update with the new data
+            savedApplication = await applicationService.updateApplicationByExternalKey(externalKey, req.body);
+          } else {
+            throw fallbackError;
+          }
+        }
+      } else {
+        throw error;
+      }
+    }
+    
+    console.log(`✅ Application ${externalKey} saved successfully to MongoDB`);
+    console.log('📊 Saved data summary:', {
+      hasBusiness: !!savedApplication.business,
+      hasPrincipals: !!savedApplication.principals,
+      hasPlan: !!savedApplication.plan,
+      hasBankAccount: !!savedApplication.bankAccount,
+      hasShipping: !!savedApplication.shipping,
+      hasStatementDelivery: !!savedApplication.statementDeliveryMethod,
+      businessFields: savedApplication.business ? Object.keys(savedApplication.business) : [],
+      principalCount: savedApplication.principals ? savedApplication.principals.length : 0
+    });
+    
+    res.json({
+      status: 'success',
+      message: 'Application saved successfully to MongoDB',
+      mongoApplication: savedApplication,
+      savedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error(`❌ Error saving application ${req.params.externalKey}:`, error);
+    handleApiError(res, error);
+  }
+};
+
+exports.getApplicationDataSummary = async (req, res) => {
+  try {
+    const { externalKey } = req.params;
+    
+    console.log(`📊 Getting data summary for application: ${externalKey}`);
+    
+    const application = await applicationService.getApplicationByExternalKey(externalKey);
+    
+    if (!application) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Application not found'
+      });
+    }
+    
+    // Create a comprehensive data summary
+    const dataSummary = {
+      externalKey: application.externalKey,
+      status: application.status,
+      lastUpdated: application.updatedAt,
+      dataCompleteness: {
+        basicInfo: {
+          agent: !!application.agent,
+          applicationName: !!application.applicationName,
+          externalKey: !!application.externalKey
+        },
+        business: {
+          corporateName: !!application.business?.corporateName,
+          dbaName: !!application.business?.dbaName,
+          businessType: !!application.business?.businessType,
+          federalTaxIdNumber: !!application.business?.federalTaxIdNumber,
+          mcc: !!application.business?.mcc,
+          phone: !!application.business?.phone,
+          email: !!application.business?.email,
+          averageTicketAmount: !!application.business?.averageTicketAmount,
+          averageMonthlyVolume: !!application.business?.averageMonthlyVolume,
+          highTicketAmount: !!application.business?.highTicketAmount,
+          merchandiseServicesSold: !!application.business?.merchandiseServicesSold,
+          businessContact: !!application.business?.businessContact,
+          businessAddress: !!application.business?.businessAddress,
+          websites: !!application.business?.websites,
+          ebt: !!application.business?.ebt
+        },
+        plan: {
+          planId: !!application.plan?.planId,
+          equipmentCostToMerchant: !!application.plan?.equipmentCostToMerchant,
+          accountSetupFee: !!application.plan?.accountSetupFee,
+          discountFrequency: !!application.plan?.discountFrequency,
+          equipment: !!application.plan?.equipment
+        },
+        shipping: {
+          shippingDestination: !!application.shipping?.shippingDestination,
+          deliveryMethod: !!application.shipping?.deliveryMethod
+        },
+        principals: {
+          count: application.principals ? application.principals.length : 0,
+          hasPersonalGuarantor: application.principals ? application.principals.some(p => p.isPersonalGuarantor) : false
+        },
+        bankAccount: {
+          abaRouting: !!application.bankAccount?.abaRouting,
+          accountType: !!application.bankAccount?.accountType,
+          demandDepositAccount: !!application.bankAccount?.demandDepositAccount
+        },
+        statementDeliveryMethod: !!application.statementDeliveryMethod,
+        documents: {
+          count: application.documents ? application.documents.length : 0,
+          types: application.documents ? application.documents.map(d => d.type) : []
+        }
+      },
+      fieldValues: {
+        business: application.business || {},
+        plan: application.plan || {},
+        shipping: application.shipping || {},
+        principals: application.principals || [],
+        bankAccount: application.bankAccount || {},
+        statementDeliveryMethod: application.statementDeliveryMethod
+      }
+    };
+    
+    res.json({
+      status: 'success',
+      message: 'Data summary retrieved successfully',
+      dataSummary,
+      retrievedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error(`❌ Error getting data summary for ${req.params.externalKey}:`, error);
+    handleApiError(res, error);
   }
 };

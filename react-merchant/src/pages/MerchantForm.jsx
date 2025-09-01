@@ -4,6 +4,7 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import ProgressBar from '../components/ProgressBar';
 import ThankYouMessage from '../components/ThankYouMessage';
 import ErrorModal from '../components/ErrorModal';
+import Toast from '../components/Toast';
 import DocumentUpload from '../components/DocumentUpload';
 import {
   getApplication,
@@ -98,6 +99,7 @@ const MerchantForm = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [documents, setDocuments] = useState([]);
   const [bankVerificationRequired, setBankVerificationRequired] = useState(false);
+  const [toast, setToast] = useState(null);
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
@@ -257,16 +259,16 @@ const MerchantForm = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value, type } = e.target;
-    let processedValue = value;
+    const { name, value, type, checked } = e.target;
+    let processedValue = type === 'checkbox' ? checked : value;
     
     // Debug logging for principal fields
     if (name.includes('principals')) {
-      console.log('🔍 Principal field change:', { name, value, type });
+      console.log('🔍 Principal field change:', { name, value: processedValue, type, checked });
     }
 
     // Convert to number if the field is numeric
-    if (type === 'number' || name.includes('plan.') || name.includes('equipment') || name.includes('percentOfBusinessTransactions') || name.includes('accountSetupFee') || name.includes('equipmentCostToMerchant')) {
+    if (type === 'number' || name.includes('plan.') || name.includes('equipment') || name.includes('percentOfBusinessTransactions') || name.includes('accountSetupFee') || name.includes('equipmentCostToMerchant') || name.includes('equityOwnershipPercentage')) {
       processedValue = value === '' ? '' : Number(value);
     }
 
@@ -282,6 +284,38 @@ const MerchantForm = () => {
     
     // Mark that there are unsaved changes
     setHasUnsavedChanges(true);
+
+    // Handle principals array fields (e.g., principals[0].firstName)
+    if (name.includes('principals[') && name.includes(']')) {
+      const match = name.match(/principals\[(\d+)\]\.(.+)/);
+      if (match) {
+        const index = parseInt(match[1]);
+        const field = match[2];
+        
+        setFormData((prev) => {
+          const newState = { ...prev };
+          
+          // Ensure principals array exists
+          if (!newState.principals) {
+            newState.principals = [];
+          }
+          
+          // Ensure the principal at the specified index exists
+          if (!newState.principals[index]) {
+            newState.principals[index] = {};
+          }
+          
+          // Update the specific field
+          newState.principals[index][field] = processedValue;
+          
+          console.log('✅ Updated principal field:', { index, field, value: processedValue });
+          console.log('📝 New principals state:', newState.principals);
+          
+          return newState;
+        });
+        return;
+      }
+    }
 
     // Handle nested fields (e.g., business.corporateName, plan.planId, business.websites.0.url)
     if (name.includes('.')) {
@@ -340,8 +374,6 @@ const MerchantForm = () => {
     try {
       const data = await getApplication(externalKey);
       
-      console.log('📥 Raw data received:', data);
-      
       if (data && data.status !== 'error') {
         // Prioritize MongoDB data, fallback to PaymentsHub data
         const appData = data.mongoApplication || data.paymentsHubResponse || data;
@@ -366,8 +398,10 @@ const MerchantForm = () => {
           // Set existing application flag
           setIsExistingApplication(true);
           
-          setSuccessMessage('Application data loaded successfully!');
-          setTimeout(() => setSuccessMessage(''), 3000);
+          setToast({
+            message: 'Application data loaded successfully!',
+            type: 'success'
+          });
         } else {
           console.warn('No application data found');
         }
@@ -619,8 +653,11 @@ const MerchantForm = () => {
           localStorage.setItem(`formData_${response.mongoApplication.externalKey}`, JSON.stringify(formData));
         }
         
-        // Show success message and update last saved timestamp
-        setSuccessMessage('Application saved successfully!');
+        // Show success toast instead of modal
+        setToast({
+          message: 'Application saved successfully!',
+          type: 'success'
+        });
         setLastSaved(new Date());
         setHasUnsavedChanges(false); // Clear unsaved changes flag
         console.log('✅ Application saved successfully to MongoDB');
@@ -632,8 +669,11 @@ const MerchantForm = () => {
       }
     } catch (error) {
       console.error('❌ Error saving application:', error);
-      // Don't show error modal for save failures, just log them
-      // The user can continue working on the form
+      // Show error toast
+      setToast({
+        message: 'Failed to save application. Please try again.',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -674,10 +714,19 @@ const MerchantForm = () => {
       const validateData = await validateApplication(formData.externalKey);
       setValidationResponse(validateData);
       
-              if (validateData) {
-          setLoadingMessage('Submitting application to PaymentsHub...');
-          
-          // Submit to underwriting (this will call PaymentsHub API)
+      // Check if validation returned errors (422 response)
+      if (validateData && validateData.details && validateData.details.data && validateData.details.data.errors) {
+        // Validation failed - show errors
+        setErrors(validateData.details.data.errors);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If validation passed, proceed with submission
+      if (validateData) {
+        setLoadingMessage('Submitting application to PaymentsHub...');
+        
+        // Submit to underwriting (this will call PaymentsHub API)
         const submitResponse = await submitToUnderwriting(formData.externalKey, formData);
         
         if (submitResponse?.status === 'success') {
@@ -699,12 +748,20 @@ const MerchantForm = () => {
       if (error.response?.data) {
         // API error response
         const errorData = error.response.data;
-        if (errorData.errors) {
+        
+        // Check for validation errors in the nested structure (422 response)
+        if (errorData.details?.data?.errors) {
+          // This is the validation error structure from the 422 response
+          setErrors(errorData.details.data.errors);
+        } else if (errorData.errors) {
+          // Direct errors object
           setErrors(errorData.errors);
         } else if (errorData.error) {
           setErrors({ general: [errorData.error] });
+        } else if (errorData.message) {
+          setErrors({ general: [errorData.message] });
         } else {
-          setErrors({ general: [errorData.message || 'Failed to submit application'] });
+          setErrors({ general: ['Failed to submit application'] });
         }
       } else if (error.message) {
         // Local error
@@ -726,10 +783,8 @@ const MerchantForm = () => {
       }));
       loadApplicationData(externalKey);
       setIsExistingApplication(true);
-    } else if (!externalKey && !isExistingApplication) {
-      // Only add one principal initially, the form will handle adding more if needed
-      addPrincipal();
     }
+    // Note: Principal initialization is now handled in the form data structure initialization useEffect
   }, [searchParams, isExistingApplication]);
 
   // Warn user before leaving with unsaved changes
@@ -790,8 +845,10 @@ const MerchantForm = () => {
       if (formData.externalKey && hasUnsavedChanges) {
         localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
         setHasUnsavedChanges(false);
-        setSuccessMessage('Form auto-saved before moving to next step');
-        setTimeout(() => setSuccessMessage(''), 2000);
+        setToast({
+          message: 'Form auto-saved before moving to next step',
+          type: 'info'
+        });
       }
       setCurrentStep(currentStep + 1);
     }
@@ -803,8 +860,10 @@ const MerchantForm = () => {
       if (formData.externalKey && hasUnsavedChanges) {
         localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
         setHasUnsavedChanges(false);
-        setSuccessMessage('Form auto-saved before moving to previous step');
-        setTimeout(() => setSuccessMessage(''), 2000);
+        setToast({
+          message: 'Form auto-saved before moving to previous step',
+          type: 'info'
+        });
       }
       setCurrentStep(currentStep - 1);
     }
@@ -823,25 +882,7 @@ const MerchantForm = () => {
   return (
     <div className="min-h-screen bg-black py-8 px-4 sm:px-6 lg:px-8">
       {isLoading && <LoadingOverlay message={loadingMessage} />}
-      {errors && <ErrorModal errors={errors} onClose={() => setErrors(null)
-      } />}
-      {successMessage && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-green-800 text-white p-6 rounded-lg shadow-lg max-w-md mx-4">
-            <div className="flex items-center mb-4">
-              <div className="text-green-400 text-2xl mr-3">✅</div>
-              <h3 className="text-lg font-semibold">Success!</h3>
-            </div>
-            <p className="mb-4">{successMessage}</p>
-            <button
-              onClick={() => setSuccessMessage('')}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
+      {errors && <ErrorModal errors={errors} onClose={() => setErrors(null)} />}
       {showThankYou ? (
         <ThankYouMessage
           submissionResponse={submissionResponse}
@@ -854,31 +895,6 @@ const MerchantForm = () => {
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-white">Merchant Application Form</h1>
               <p className="text-white mt-2">Complete merchant and business details for processing</p>
-              {isExistingApplication && (
-                <div className="mt-4 p-3 bg-blue-900 border border-blue-700 rounded-md">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="text-blue-300 mr-2">📝</div>
-                      <span className="text-blue-200 text-sm">
-                        This is an existing application. You can edit any field and save your changes.
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className={`text-xs flex items-center ${hasUnsavedChanges ? 'text-yellow-300' : 'text-green-300'}`}>
-                        <span className={`w-2 h-2 rounded-full mr-2 ${hasUnsavedChanges ? 'bg-yellow-400' : 'bg-green-400'}`}></span>
-                        {hasUnsavedChanges ? 'Form has unsaved changes' : 'Form is editable'}
-                      </div>
-                      {lastSaved && (
-                        <div className="text-blue-300 text-xs">
-                          Last saved: {lastSaved.toLocaleTimeString()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-
-                </div>
-              )}
             </div>
             <ProgressBar currentStep={currentStep} totalSteps={3} />
             {hasUnsavedChanges && (
@@ -977,9 +993,8 @@ const MerchantForm = () => {
                         id="plan.equipmentCostToMerchant"
                         name="plan.equipmentCostToMerchant"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                        value={formData.plan?.equipmentCostToMerchant || ''}
+                        value={formData.plan?.equipmentCostToMerchant || '0'}
                         onChange={handleInputChange}
-                        step="0.01"
                       />
                     </div>
                     <div className="form-group">
@@ -1932,14 +1947,6 @@ const MerchantForm = () => {
                     <div className="section-title text-xl font-bold text-white dark:text-white mb-4">
                       Additional Business Details
                     </div>
-                    <div className="mb-4 p-4 bg-blue-900 border border-blue-700 rounded-md">
-                      <div className="flex items-center">
-                        <div className="text-blue-300 mr-2">⚙️</div>
-                        <span className="text-blue-200 text-sm">
-                          Complete these additional business configuration details.
-                        </span>
-                      </div>
-                    </div>
                   </div>
                   
                   <div className="form-group">
@@ -2131,7 +2138,7 @@ const MerchantForm = () => {
                         <label
                           htmlFor="business.businessAddress.shipTo.state"
                           className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
+                        >   
                           ShipTo State
                         </label>
                         <input
@@ -2156,100 +2163,6 @@ const MerchantForm = () => {
                           name="business.businessAddress.shipTo.zipCode"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                           value={formData.business?.businessAddress?.shipTo?.zipCode || ''}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
-                      Website Information
-                    </div>
-                    <div className="form-grid grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="form-group">
-                        <label
-                          htmlFor="business.websites.0.url"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Website URL
-                        </label>
-                        <input
-                          type="text"
-                          id="business.websites.0.url"
-                          name="business.websites.0.url"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.websites?.[0]?.url || ''}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business.websites.0.websiteCustomerServiceEmail"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Customer Service Email
-                        </label>
-                        <input
-                          type="email"
-                          id="business.websites.0.websiteCustomerServiceEmail"
-                          name="business.websites.0.websiteCustomerServiceEmail"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.websites?.[0]?.websiteCustomerServiceEmail || ''}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business.websites.0.websiteCustomerServicePhoneNumber"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          Customer Service Phone
-                        </label>
-                        <input
-                          type="text"
-                          id="business.websites.0.websiteCustomerServicePhoneNumber"
-                          name="business.websites.0.websiteCustomerServicePhoneNumber"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.websites?.[0]?.websiteCustomerServicePhoneNumber || ''}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
-                      EBT Services
-                    </div>
-                    <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="form-group">
-                        <label
-                          htmlFor="business.ebt.ebtType"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          EBT Type
-                        </label>
-                        <input
-                          type="text"
-                          id="business.ebt.ebtType"
-                          name="business.ebt.ebtType"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.ebt?.ebtType || ''}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label
-                          htmlFor="business.ebt.ebtAccountNumber"
-                          className="block text-sm font-medium text-white dark:text-white mb-1"
-                        >
-                          EBT Account Number
-                        </label>
-                        <input
-                          type="text"
-                          id="business.ebt.ebtAccountNumber"
-                          name="business.ebt.ebtAccountNumber"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                          value={formData.business?.ebt?.ebtAccountNumber || ''}
                           onChange={handleInputChange}
                         />
                       </div>
@@ -2464,67 +2377,6 @@ const MerchantForm = () => {
                       'Save Application'
                     )}
                   </button>
-                  <p className={`text-xs mt-2 text-center ${hasUnsavedChanges ? 'text-yellow-400' : 'text-gray-400'}`}>
-                    {hasUnsavedChanges ? '⚠️ You have unsaved changes' : 'Save frequently to preserve your work'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (formData.externalKey) {
-                        localStorage.setItem(`formData_${formData.externalKey}`, JSON.stringify(formData));
-                        setSuccessMessage('Form data saved to browser!');
-                        setLastSaved(new Date());
-                        setHasUnsavedChanges(false);
-                      }
-                    }}
-                    className="text-xs text-blue-400 hover:text-blue-300 mt-1 mr-2"
-                    title="Save form data to browser for backup"
-                  >
-                    💾 Save to Browser
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (formData.externalKey) {
-                        const savedData = localStorage.getItem(`formData_${formData.externalKey}`);
-                        if (savedData) {
-                          try {
-                            const parsedData = JSON.parse(savedData);
-                            setFormData(parsedData);
-                            setSuccessMessage('Form data restored from browser!');
-                            setHasUnsavedChanges(false);
-                          } catch (error) {
-                            setSuccessMessage('Error restoring form data');
-                          }
-                        } else {
-                          setSuccessMessage('No saved data found');
-                        }
-                      }
-                    }}
-                    className="text-xs text-green-400 hover:text-green-300 mt-1 mr-2"
-                    title="Restore form data from browser"
-                  >
-                    🔄 Restore from Browser
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (formData.externalKey) {
-                        try {
-                          const summary = await getApplicationDataSummary(formData.externalKey);
-                          console.log('📊 MongoDB Data Summary:', summary);
-                          setSuccessMessage('Data summary logged to console!');
-                          setTimeout(() => setSuccessMessage(''), 3000);
-                        } catch (error) {
-                          setSuccessMessage('Error getting data summary');
-                        }
-                      }
-                    }}
-                    className="text-xs text-purple-400 hover:text-purple-300 mt-1"
-                    title="Get MongoDB data summary"
-                  >
-                    📊 MongoDB Summary
-                  </button>
                 </div>
 
                 {currentStep < 3 ? (
@@ -2546,6 +2398,15 @@ const MerchantForm = () => {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

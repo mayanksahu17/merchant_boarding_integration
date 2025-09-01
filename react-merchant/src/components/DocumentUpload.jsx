@@ -81,11 +81,11 @@ const DocumentUpload = ({ externalKey, documents, onDocumentUpdate, bankVerifica
       <div className="bg-gray-700 p-6 rounded-lg">
         <h3 className="text-xl font-semibold text-white mb-4">Document Upload</h3>
         
-        {bankVerificationRequired && (
+        {/* {bankVerificationRequired && (
           <div className="mb-4 p-4 bg-yellow-600 text-white rounded">
             ⚠️ Bank verification document required before submission
           </div>
-        )}
+        )} */}
 
         <div className="space-y-4">
           <div>

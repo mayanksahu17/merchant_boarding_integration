@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-//  const API_BASE_URL = 'https://api.merchant.zifypay.com/api';
- const API_BASE_URL = 'http://localhost:8000/api'; 
+ const API_BASE_URL = 'https://api.merchant.zifypay.com/api';
+//  const API_BASE_URL = 'http://localhost:8000/api'; 
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -104,6 +104,10 @@ export const validateApplication = async (externalKey) => {
     const response = await api.get(`/applications/validate/${externalKey}`);
     return response.data;
   } catch (error) {
+    // Return the error response data instead of throwing
+    if (error.response?.data) {
+      return error.response.data;
+    }
     throw error.response?.data?.message || 'Failed to validate application';
   }
 };

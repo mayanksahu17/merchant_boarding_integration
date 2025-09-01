@@ -16,61 +16,6 @@ const createApplication = async (applicationData) => {
 
 const getApplicationByExternalKey = async (externalKey) => {
   const application = await Application.findOne({ externalKey });
-  
-  if (application) {
-    // Log comprehensive data summary
-    console.log(`📊 Data summary for ${externalKey}:`, {
-      basicInfo: {
-        agent: application.agent,
-        applicationName: application.applicationName,
-        externalKey: application.externalKey,
-        status: application.status,
-        createdAt: application.createdAt,
-        updatedAt: application.updatedAt
-      },
-      business: application.business ? {
-        corporateName: application.business.corporateName,
-        dbaName: application.business.dbaName,
-        businessType: application.business.businessType,
-        federalTaxIdNumber: application.business.federalTaxIdNumber,
-        mcc: application.business.mcc,
-        phone: application.business.phone,
-        email: application.business.email,
-        averageTicketAmount: application.business.averageTicketAmount,
-        averageMonthlyVolume: application.business.averageMonthlyVolume,
-        hasBusinessContact: !!application.business.businessContact,
-        hasBusinessAddress: !!application.business.businessAddress,
-        hasWebsites: !!application.business.websites,
-        hasEbt: !!application.business.ebt
-      } : null,
-      plan: application.plan ? {
-        planId: application.plan.planId,
-        equipmentCostToMerchant: application.plan.equipmentCostToMerchant,
-        accountSetupFee: application.plan.accountSetupFee,
-        discountFrequency: application.plan.discountFrequency,
-        equipmentCount: application.plan.equipment ? application.plan.equipment.length : 0
-      } : null,
-      shipping: application.shipping ? {
-        shippingDestination: application.shipping.shippingDestination,
-        deliveryMethod: application.shipping.deliveryMethod
-      } : null,
-      principals: application.principals ? {
-        count: application.principals.length,
-        hasPersonalGuarantor: application.principals.some(p => p.isPersonalGuarantor)
-      } : null,
-      bankAccount: application.bankAccount ? {
-        abaRouting: application.bankAccount.abaRouting,
-        accountType: application.bankAccount.accountType,
-        demandDepositAccount: application.bankAccount.demandDepositAccount
-      } : null,
-      statementDeliveryMethod: application.statementDeliveryMethod,
-      documents: application.documents ? {
-        count: application.documents.length,
-        types: application.documents.map(d => d.type)
-      } : null
-    });
-  }
-  
   return application;
 };
 
@@ -429,7 +374,7 @@ const submitToUnderwriting = async (externalKey) => {
 const getApplicationPDF = async (externalKey, accessToken) => {
   try {
     const response = await axios.get(
-      `https://boarding-api.paymentshub.com/enroll/application/pdf/key/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/pdf/key/${externalKey}`,
       {
         responseType: 'arraybuffer',
         headers: {
@@ -503,7 +448,7 @@ const getDocumentTypes = async (accessToken) => {
 const uploadDocumentToPaymentsHub = async (externalKey, documentData, accessToken) => {
   try {
     const response = await axios.put(
-      `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/document/upload/key/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/document/upload/key/${externalKey}`,
       {
         fileName: documentData.fileName,
         fileType: documentData.fileType,

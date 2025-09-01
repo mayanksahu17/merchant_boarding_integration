@@ -85,7 +85,7 @@ exports.getApplication = async (req, res) => {
     let paymentsHubResponse = null;
     try {
       const response = await axios.get(
-        `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/application/key/${externalKey}`,
+        `${process.env.API_ENDPOINT}/enroll/application/key/${externalKey}`,
         {
           headers: {
             Authorization: `Bearer ${req.accessToken}`,
@@ -116,7 +116,7 @@ exports.getApplication = async (req, res) => {
     // If MongoDB fails, try to return PaymentsHub data if available
     try {
       const response = await axios.get(
-        `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/application/key/${req.params.externalKey}`,
+        `${process.env.API_ENDPOINT}/enroll/application/key/${req.params.externalKey}`,
         {
           headers: {
             Authorization: `Bearer ${req.accessToken}`,
@@ -236,7 +236,7 @@ exports.submitToUnderwriting = async (req, res) => {
     
     // Call PaymentsHub API
     const response = await axios.put(
-      `${process.env.API_ENDPOINT || 'https://boarding-api.paymentshub.com'}/enroll/application/submit/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/submit/${externalKey}`,
       {},
       {
         headers: {
@@ -615,8 +615,7 @@ exports.saveApplication = async (req, res) => {
 exports.getApplicationDataSummary = async (req, res) => {
   try {
     const { externalKey } = req.params;
-    
-    console.log(`📊 Getting data summary for application: ${externalKey}`);
+  
     
     const application = await applicationService.getApplicationByExternalKey(externalKey);
     
@@ -699,7 +698,6 @@ exports.getApplicationDataSummary = async (req, res) => {
     });
     
   } catch (error) {
-    console.error(`❌ Error getting data summary for ${req.params.externalKey}:`, error);
     handleApiError(res, error);
   }
 };

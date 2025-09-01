@@ -23,7 +23,7 @@ router.post('/api/merchant/full-update', async (req, res) => {
       return res.status(400).json({ error: 'externalKey is required' });
     }
     const response = await axios.patch(
-      `https://boarding-api.paymentshub.com/enroll/application/key/${externalKey}`,
+      `${process.env.API_ENDPOINT}/enroll/application/key/${externalKey}`,
       req.body,
       {
         headers: {

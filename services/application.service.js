@@ -134,7 +134,22 @@ const updateApplicationByExternalKey = async (externalKey, updateData) => {
   console.log('Final application data before save:', JSON.stringify(application, null, 2));
   
   try {
-    return await application.save();
+    // Use findOneAndUpdate instead of save() to avoid version conflicts
+    const updatedApplication = await Application.findOneAndUpdate(
+      { externalKey },
+      { $set: application.toObject() },
+      { 
+        new: true, 
+        runValidators: true,
+        upsert: false 
+      }
+    );
+    
+    if (!updatedApplication) {
+      throw new Error('Failed to update application');
+    }
+    
+    return updatedApplication;
   } catch (error) {
     console.error('❌ Save error:', error);
     console.error('❌ Error details:', error.message);
@@ -173,6 +188,56 @@ const updateApplicationWithSchemaFix = async (externalKey, updateData) => {
         console.log('✅ Schema conflict resolved, now updating with full data...');
         // Now try to update with the full data
         return await updateApplicationByExternalKey(externalKey, updateData);
+      }
+    }
+    
+    // If all else fails, throw the original error
+    throw error;
+  }
+};
+
+// Enhanced fallback method to handle version conflicts
+const updateApplicationWithVersionFix = async (externalKey, updateData) => {
+  try {
+    // First try the normal update
+    return await updateApplicationByExternalKey(externalKey, updateData);
+  } catch (error) {
+    console.log('⚠️ Normal update failed, trying version conflict fix...');
+    
+    // If there's a version conflict, try to resolve it
+    if (error.message && error.message.includes('No matching document found for id')) {
+      console.log('🔧 Attempting to fix version conflict...');
+      
+      try {
+        // Get the latest version of the document
+        const latestApp = await Application.findOne({ externalKey });
+        if (!latestApp) {
+          throw new Error('Application not found');
+        }
+        
+        // Use findOneAndUpdate with the latest data to avoid version conflicts
+        const updatedApp = await Application.findOneAndUpdate(
+          { externalKey },
+          { 
+            $set: {
+              ...updateData,
+              updatedAt: new Date(),
+              __v: latestApp.__v // Use the current version
+            }
+          },
+          { 
+            new: true, 
+            runValidators: true,
+            upsert: false 
+          }
+        );
+        
+        if (updatedApp) {
+          console.log('✅ Version conflict resolved, application updated successfully');
+          return updatedApp;
+        }
+      } catch (versionFixError) {
+        console.error('❌ Version conflict fix failed:', versionFixError.message);
       }
     }
     
@@ -468,12 +533,96 @@ const uploadDocumentToPaymentsHub = async (externalKey, documentData, accessToke
   }
 };
 
+// Comprehensive save method with multiple fallback strategies
+const saveApplicationComprehensive = async (externalKey, updateData) => {
+  console.log('🔄 Attempting comprehensive save for application:', externalKey);
+  
+  // Strategy 1: Try normal update
+  try {
+    console.log('📝 Strategy 1: Normal update');
+    return await updateApplicationByExternalKey(externalKey, updateData);
+  } catch (error1) {
+    console.log('⚠️ Strategy 1 failed:', error1.message);
+    
+    // Strategy 2: Try version conflict fix
+    if (error1.message && error1.message.includes('No matching document found for id')) {
+      try {
+        console.log('📝 Strategy 2: Version conflict fix');
+        return await updateApplicationWithVersionFix(externalKey, updateData);
+      } catch (error2) {
+        console.log('⚠️ Strategy 2 failed:', error2.message);
+      }
+    }
+    
+    // Strategy 3: Try schema fix
+    if (error1.message && error1.message.includes('Cast to string failed')) {
+      try {
+        console.log('📝 Strategy 3: Schema fix');
+        return await updateApplicationWithSchemaFix(externalKey, updateData);
+      } catch (error3) {
+        console.log('⚠️ Strategy 3 failed:', error3.message);
+      }
+    }
+    
+    // Strategy 4: Use findOneAndUpdate directly (bypasses all previous methods)
+    try {
+      console.log('📝 Strategy 4: Direct findOneAndUpdate');
+      const updatedApp = await Application.findOneAndUpdate(
+        { externalKey },
+        { $set: updateData },
+        { 
+          new: true, 
+          runValidators: true,
+          upsert: false 
+        }
+      );
+      
+      if (updatedApp) {
+        console.log('✅ Strategy 4 succeeded');
+        return updatedApp;
+      }
+    } catch (error4) {
+      console.log('⚠️ Strategy 4 failed:', error4.message);
+    }
+    
+    // Strategy 5: Nuclear option - complete schema reset
+    try {
+      console.log('📝 Strategy 5: Complete schema reset');
+      const resetApp = await resetApplicationSchema(externalKey);
+      if (resetApp) {
+        // Try to update with the new data after reset
+        const finalApp = await Application.findOneAndUpdate(
+          { externalKey },
+          { $set: updateData },
+          { 
+            new: true, 
+            runValidators: true,
+            upsert: false 
+          }
+        );
+        
+        if (finalApp) {
+          console.log('✅ Strategy 5 succeeded');
+          return finalApp;
+        }
+      }
+    } catch (error5) {
+      console.log('⚠️ Strategy 5 failed:', error5.message);
+    }
+    
+    // If all strategies failed, throw the most relevant error
+    console.error('❌ All save strategies failed');
+    throw new Error(`Failed to save application after trying all strategies. Last error: ${error1.message}`);
+  }
+};
+
 module.exports = {
   createApplication,
   getApplicationByExternalKey,
   getAllApplications,
   updateApplicationByExternalKey,
   updateApplicationWithSchemaFix,
+  updateApplicationWithVersionFix,
   resetApplicationSchema,
   changeApplicationStatus,
   deleteApplication,
@@ -486,5 +635,6 @@ module.exports = {
   submitToUnderwriting,
   getApplicationPDF,
   getDocumentTypes,
-  uploadDocumentToPaymentsHub
+  uploadDocumentToPaymentsHub,
+  saveApplicationComprehensive
 };

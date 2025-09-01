@@ -566,26 +566,11 @@ exports.saveApplication = async (req, res) => {
     // Only save to MongoDB - no PaymentsHub API call
     let savedApplication;
     try {
-      savedApplication = await applicationService.updateApplicationByExternalKey(externalKey, req.body);
+      // Use the comprehensive save method that handles all error types
+      savedApplication = await applicationService.saveApplicationComprehensive(externalKey, req.body);
     } catch (error) {
-      console.log('⚠️ Primary save method failed, trying fallback...');
-      if (error.message && error.message.includes('Cast to string failed')) {
-        try {
-          savedApplication = await applicationService.updateApplicationWithSchemaFix(externalKey, req.body);
-        } catch (fallbackError) {
-          console.log('⚠️ Fallback method failed, trying schema reset...');
-          if (fallbackError.message && fallbackError.message.includes('Cast to string failed')) {
-            console.log('🚨 Using nuclear option: complete schema reset');
-            savedApplication = await applicationService.resetApplicationSchema(externalKey);
-            // After reset, try to update with the new data
-            savedApplication = await applicationService.updateApplicationByExternalKey(externalKey, req.body);
-          } else {
-            throw fallbackError;
-          }
-        }
-      } else {
-        throw error;
-      }
+      console.error('❌ All save strategies failed:', error.message);
+      throw error;
     }
     
     console.log(`✅ Application ${externalKey} saved successfully to MongoDB`);

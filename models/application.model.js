@@ -167,6 +167,9 @@ const applicationSchema = new mongoose.Schema({
   status: { type: String, default: 'draft' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, { 
+  versionKey: false, // Disable optimistic concurrency control
+  timestamps: false  // We're handling timestamps manually
 });
 
 applicationSchema.pre('save', function(next) {

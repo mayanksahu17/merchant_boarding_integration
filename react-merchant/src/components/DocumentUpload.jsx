@@ -76,16 +76,31 @@ const DocumentUpload = ({ externalKey, documents, onDocumentUpdate, bankVerifica
     return <div className="text-center text-gray-400">Loading document types...</div>;
   }
 
+  // Check if at least one bank verification document is uploaded
+  const bankDocTypes = ['VOIDED CHECK', 'BANK STATEMENT', 'BANK LETTER'];
+  const hasBankVerificationDoc = documents.some(doc => 
+    bankDocTypes.includes(doc.type?.toUpperCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="bg-gray-700 p-6 rounded-lg">
         <h3 className="text-xl font-semibold text-white mb-4">Document Upload</h3>
         
-        {/* {bankVerificationRequired && (
-          <div className="mb-4 p-4 bg-yellow-600 text-white rounded">
-            ⚠️ Bank verification document required before submission
+        {/* Bank Verification Requirement Notice */}
+        <div className={`mb-4 p-4 rounded-md border ${
+          hasBankVerificationDoc 
+            ? 'bg-blue-900/30 border-blue-700 text-blue-200' 
+            : 'bg-yellow-900/30 border-yellow-700 text-yellow-200'
+        }`}>
+          <div className="flex items-start">
+            <span className="mr-2 text-lg">{hasBankVerificationDoc ? '✓' : '⚠️'}</span>
+            <span className="text-sm">
+              <strong>Bank Verification Required:</strong> At least one bank verification document 
+              (voided check, bank statement, or bank letter) is required before submission.
+            </span>
           </div>
-        )} */}
+        </div>
 
         <div className="space-y-4">
           <div>

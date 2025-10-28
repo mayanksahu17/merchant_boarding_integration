@@ -1695,9 +1695,35 @@ const MerchantForm = () => {
                     </div>
                   </div>
                   <div className="array-section space-y-4">
-                    <div className="array-section-title text-lg font-semibold text-white dark:text-white">
-                      Business Transaction Percentages
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="array-section-title text-lg font-semibold text-white dark:text-white">
+                        Business Transaction Percentages
+                      </div>
                     </div>
+                    {/* Calculate and display total percentage */}
+                    {(() => {
+                      const cardSwiped = parseFloat(formData.business?.percentOfBusinessTransactions?.cardSwiped) || 0;
+                      const keyedCardPresent = parseFloat(formData.business?.percentOfBusinessTransactions?.keyedCardPresentNotImprinted) || 0;
+                      const mailOrPhoneOrder = parseFloat(formData.business?.percentOfBusinessTransactions?.mailOrPhoneOrder) || 0;
+                      const internet = parseFloat(formData.business?.percentOfBusinessTransactions?.internet) || 0;
+                      const total = cardSwiped + keyedCardPresent + mailOrPhoneOrder + internet;
+                      const isValidTotal = total === 100;
+                      
+                      return (
+                        <div className={`mb-4 p-3 rounded-md border ${
+                          isValidTotal || total === 0
+                            ? 'bg-blue-900/30 border-blue-700 text-blue-200'
+                            : 'bg-yellow-900/30 border-yellow-700 text-yellow-200'
+                        }`}>
+                          <div className="flex items-center">
+                            <span className="mr-2">{isValidTotal ? '✓' : '⚠️'}</span>
+                            <span className="text-sm">
+                              <strong>Total: {total}%</strong> - All 4 percentages must add up to exactly 100%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="form-group">
                         <label

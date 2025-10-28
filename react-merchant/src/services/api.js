@@ -114,14 +114,18 @@ export const validateApplication = async (externalKey) => {
 
 export const submitToUnderwriting = async (externalKey, formData) => {
   try {
-    // Using PUT or POST depending on your backend implementation
-    // Choose one of the following:
-    const response = await api.put(`/applications/submit/${externalKey}`, formData);
-    // OR
-    // const response = await api.post(`/applications/submit/${externalKey}`, formData);
+    // Backend route is POST /applications/:externalKey/submit
+    const response = await api.post(`/applications/${externalKey}/submit`, formData);
     return response.data;
   } catch (error) {
-    throw error.response?.data?.message || 'Failed to submit application to underwriting';
+    // Preserve the full error object so we can access error details
+    if (error.response?.data) {
+      const apiError = new Error(error.response.data.message || 'Failed to submit application to underwriting');
+      apiError.response = error.response;
+      apiError.status = error.response.status;
+      throw apiError;
+    }
+    throw error;
   }
 };
 export const updateApplication = async (externalKey, formData) => {
@@ -129,7 +133,15 @@ export const updateApplication = async (externalKey, formData) => {
     const response = await api.patch(`/applications/${externalKey}`, formData);
     return response.data;
   } catch (error) {
-    throw error.response?.data?.message || 'Failed to update application';
+    // Preserve the full error object so we can access error details
+    if (error.response?.data) {
+      // Throw the full error object so we can access details.data.errors for 422 responses
+      const apiError = new Error(error.response.data.message || 'Failed to update application');
+      apiError.response = error.response;
+      apiError.status = error.response.status;
+      throw apiError;
+    }
+    throw error;
   }
 };
 

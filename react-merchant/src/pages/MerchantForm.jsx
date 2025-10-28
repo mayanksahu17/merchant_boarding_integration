@@ -694,6 +694,273 @@ const MerchantForm = () => {
     return requiresVerification;
   };
 
+  // Clean and prepare form data for PaymentsHub API
+  const cleanFormDataForPaymentsHub = (data) => {
+    const cleaned = JSON.parse(JSON.stringify(data)); // Deep clone
+    
+    // Valid US state codes
+    const validStates = ['AK', 'AL', 'AR', 'AZ', 'CA', 'CO', 'CT', 'DC', 'DE', 'FL', 'GA', 'GU', 'HI', 'IA', 'ID', 'IL', 'IN', 'KS', 'KY', 'LA', 'MA', 'MD', 'ME', 'MI', 'MN', 'MO', 'MP', 'MS', 'MT', 'NC', 'ND', 'NE', 'NH', 'NJ', 'NM', 'NV', 'NY', 'OH', 'OK', 'OR', 'PA', 'PR', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VA', 'VI', 'VT', 'WA', 'WI', 'WV', 'WY'];
+    
+    // Valid titles (lowercase)
+    const validTitles = ['ceo', 'manager', 'owner', 'partner', 'president', 'vice president'];
+    
+    // Helper to validate and normalize state code (must be exactly 2 characters and valid)
+    // If empty, returns default state "CA" since state is required
+    const normalizeState = (state, defaultState = 'CA') => {
+      if (!state || typeof state !== 'string' || state.trim() === '') {
+        return defaultState; // Use default since state is required
+      }
+      const normalized = state.trim().toUpperCase().substring(0, 2);
+      return validStates.includes(normalized) ? normalized : defaultState;
+    };
+    
+    // Helper to normalize SSN (must be 9 digits OR 4 digits based on pattern)
+    const normalizeSSN = (ssn) => {
+      if (!ssn) return '';
+      // Remove all non-digits
+      const digits = ssn.toString().replace(/\D/g, '');
+      // Pattern allows 9 digits or 4 digits - take appropriate length
+      if (digits.length === 4) {
+        return digits; // Keep 4 digits as-is
+      }
+      // Return only first 9 digits (max allowed)
+      return digits.substring(0, 9);
+    };
+    
+    // Helper to normalize phone (must be exactly 10 digits)
+    const normalizePhone = (phone) => {
+      if (!phone) return '';
+      // Remove all non-digits
+      const digits = phone.toString().replace(/\D/g, '');
+      // Return only first 10 digits
+      return digits.substring(0, 10);
+    };
+    
+    // Helper to normalize MCC (must be exactly 4 digits)
+    // We normalize to 4 digits but let PaymentsHub validate if it's a valid MCC code
+    const normalizeMCC = (mcc) => {
+      if (!mcc || (typeof mcc === 'string' && mcc.trim() === '')) {
+        return null; // Only return null if truly empty
+      }
+      // Remove all non-digits
+      const digits = mcc.toString().replace(/\D/g, '');
+      // Must be exactly 4 digits - pad or truncate as needed
+      if (digits.length === 0) return null;
+      if (digits.length < 4) {
+        return digits.padStart(4, '0');
+      }
+      return digits.substring(0, 4);
+    };
+    
+    // Helper to normalize title (must be lowercase and valid)
+    const normalizeTitle = (title) => {
+      if (!title) return '';
+      const normalized = title.toString().trim().toLowerCase();
+      return validTitles.includes(normalized) ? normalized : '';
+    };
+    
+    // Helper to get a value or use application name as fallback
+    const getValueOrAppName = (value, fallback = '') => {
+      if (value && value.toString().trim() !== '') {
+        return value.toString().trim();
+      }
+      return cleaned.applicationName || fallback || 'Business';
+    };
+    
+    // Handle business data
+    if (cleaned.business) {
+      // Convert empty strings to proper numbers (0) for required number fields
+      if (cleaned.business.averageTicketAmount === '' || cleaned.business.averageTicketAmount === null || cleaned.business.averageTicketAmount === undefined) {
+        cleaned.business.averageTicketAmount = 0;
+      } else if (typeof cleaned.business.averageTicketAmount === 'string') {
+        const parsed = parseFloat(cleaned.business.averageTicketAmount);
+        cleaned.business.averageTicketAmount = isNaN(parsed) ? 0 : parsed;
+      } else if (typeof cleaned.business.averageTicketAmount !== 'number') {
+        cleaned.business.averageTicketAmount = 0;
+      }
+      
+      if (cleaned.business.averageMonthlyVolume === '' || cleaned.business.averageMonthlyVolume === null || cleaned.business.averageMonthlyVolume === undefined) {
+        cleaned.business.averageMonthlyVolume = 0;
+      } else if (typeof cleaned.business.averageMonthlyVolume === 'string') {
+        const parsed = parseFloat(cleaned.business.averageMonthlyVolume);
+        cleaned.business.averageMonthlyVolume = isNaN(parsed) ? 0 : parsed;
+      } else if (typeof cleaned.business.averageMonthlyVolume !== 'number') {
+        cleaned.business.averageMonthlyVolume = 0;
+      }
+      
+      if (cleaned.business.highTicketAmount === '' || cleaned.business.highTicketAmount === null || cleaned.business.highTicketAmount === undefined) {
+        cleaned.business.highTicketAmount = 0;
+      } else if (typeof cleaned.business.highTicketAmount === 'string') {
+        const parsed = parseFloat(cleaned.business.highTicketAmount);
+        cleaned.business.highTicketAmount = isNaN(parsed) ? 0 : parsed;
+      } else if (typeof cleaned.business.highTicketAmount !== 'number') {
+        cleaned.business.highTicketAmount = 0;
+      }
+      
+      // Ensure text fields are non-empty strings - use application name if available
+      cleaned.business.corporateName = getValueOrAppName(cleaned.business.corporateName, cleaned.business.dbaName);
+      cleaned.business.dbaName = getValueOrAppName(cleaned.business.dbaName, cleaned.business.corporateName);
+      cleaned.business.federalTaxIdNumber = getValueOrAppName(cleaned.business.federalTaxIdNumber, '000000000');
+      
+      // Normalize MCC - only include if it has a value and is not clearly invalid
+      const normalizedMCC = normalizeMCC(cleaned.business.mcc);
+      if (normalizedMCC && normalizedMCC !== '0000') {
+        cleaned.business.mcc = normalizedMCC;
+      } else {
+        // Remove MCC if it's empty or clearly invalid (0000) - PaymentsHub will validate if required
+        delete cleaned.business.mcc;
+      }
+      
+      cleaned.business.merchandiseServicesSold = getValueOrAppName(cleaned.business.merchandiseServicesSold, 'General Merchandise');
+      
+      // For phone and email, try to get from contact first
+      if (!cleaned.business.phone || cleaned.business.phone.trim() === '') {
+        cleaned.business.phone = normalizePhone(cleaned.business.businessContact?.phoneNumber);
+      } else {
+        cleaned.business.phone = normalizePhone(cleaned.business.phone);
+      }
+      if (!cleaned.business.email || cleaned.business.email.trim() === '') {
+        cleaned.business.email = cleaned.business.businessContact?.email || cleaned.applicationEmail || '';
+      }
+      
+      // Ensure business contact exists and is complete with validated data
+      const contact = cleaned.business.businessContact || {};
+      // Get default state (use CA as fallback)
+      const defaultContactState = normalizeState(contact.state || cleaned.business.businessAddress?.dba?.state, 'CA');
+      cleaned.business.businessContact = {
+        firstName: contact.firstName || cleaned.business.corporateName?.split(' ')[0] || 'Business',
+        lastName: contact.lastName || cleaned.business.corporateName?.split(' ').slice(1).join(' ') || 'Contact',
+        socialSecurityNumber: normalizeSSN(contact.socialSecurityNumber), // Must be 9 digits max
+        dateOfBirth: contact.dateOfBirth || '',
+        phoneNumber: normalizePhone(contact.phoneNumber || cleaned.business.phone),
+        email: contact.email || cleaned.business.email || '',
+        street: contact.street || cleaned.business.businessAddress?.dba?.street || '',
+        street2: contact.street2 || '',
+        city: contact.city || cleaned.business.businessAddress?.dba?.city || '',
+        state: defaultContactState, // Must be valid 2-char state, use CA as default
+        zipCode: contact.zipCode || cleaned.business.businessAddress?.dba?.zipCode || ''
+      };
+      
+      // Ensure business address exists with validated state codes
+      const address = cleaned.business.businessAddress || {};
+      const dbaStreet = address.dba?.street || cleaned.business.businessContact.street || '';
+      const dbaCity = address.dba?.city || cleaned.business.businessContact.city || '';
+      // Use contact state as base, then normalize with CA as default
+      const dbaState = normalizeState(address.dba?.state || cleaned.business.businessContact.state, 'CA');
+      const dbaZip = address.dba?.zipCode || cleaned.business.businessContact.zipCode || '';
+      
+      cleaned.business.businessAddress = {
+        dba: {
+          street: dbaStreet,
+          city: dbaCity,
+          state: dbaState, // Ensure valid state
+          zipCode: dbaZip
+        },
+        corporate: {
+          street: address.corporate?.street || dbaStreet,
+          city: address.corporate?.city || dbaCity,
+          state: normalizeState(address.corporate?.state || dbaState, 'CA'), // Ensure valid state
+          zipCode: address.corporate?.zipCode || dbaZip
+        },
+        shipTo: {
+          street: address.shipTo?.street || dbaStreet,
+          city: address.shipTo?.city || dbaCity,
+          state: normalizeState(address.shipTo?.state || dbaState, 'CA'), // Ensure valid state
+          zipCode: address.shipTo?.zipCode || dbaZip
+        }
+      };
+      
+      // Handle EBT - only include if it has data, otherwise remove it
+      if (cleaned.business.ebt) {
+        if (!cleaned.business.ebt.ebtType || cleaned.business.ebt.ebtType.trim() === '') {
+          delete cleaned.business.ebt;
+        } else if (!cleaned.business.ebt.ebtAccountNumber || cleaned.business.ebt.ebtAccountNumber.trim() === '') {
+          // If ebtType exists but no account number, remove the whole ebt object
+          delete cleaned.business.ebt;
+        }
+      }
+    }
+    
+    // Ensure bankAccount has valid accountType
+    if (cleaned.bankAccount) {
+      const accountType = cleaned.bankAccount.accountType?.toString().toLowerCase().trim();
+      if (accountType === 'checking' || accountType === 'savings') {
+        cleaned.bankAccount.accountType = accountType;
+      } else {
+        // Default to checking if invalid
+        cleaned.bankAccount.accountType = 'checking';
+      }
+    }
+    
+    // Ensure principals array exists and has at least one principal with validated data
+    if (!cleaned.principals || !Array.isArray(cleaned.principals) || cleaned.principals.length === 0) {
+      // Create a principal from business contact data
+      // Get default state - use business contact state or CA as fallback
+      const defaultPrincipalState = normalizeState(
+        cleaned.business?.businessContact?.state || cleaned.business?.businessAddress?.dba?.state,
+        'CA'
+      );
+      cleaned.principals = [{
+        firstName: cleaned.business?.businessContact?.firstName || cleaned.business?.corporateName?.split(' ')[0] || 'Principal',
+        lastName: cleaned.business?.businessContact?.lastName || cleaned.business?.corporateName?.split(' ').slice(1).join(' ') || 'Owner',
+        socialSecurityNumber: normalizeSSN(cleaned.business?.businessContact?.socialSecurityNumber),
+        dateOfBirth: cleaned.business?.businessContact?.dateOfBirth || '',
+        phoneNumber: normalizePhone(cleaned.business?.businessContact?.phoneNumber || cleaned.business?.phone),
+        email: cleaned.business?.businessContact?.email || cleaned.business?.email || '',
+        street: cleaned.business?.businessContact?.street || cleaned.business?.businessAddress?.dba?.street || '',
+        street2: cleaned.business?.businessContact?.street2 || '',
+        city: cleaned.business?.businessContact?.city || cleaned.business?.businessAddress?.dba?.city || '',
+        state: defaultPrincipalState, // Ensure valid state with CA as default
+        zipCode: cleaned.business?.businessContact?.zipCode || cleaned.business?.businessAddress?.dba?.zipCode || '',
+        equityOwnershipPercentage: 100,
+        title: normalizeTitle('owner'), // Use normalized title
+        isPersonalGuarantor: false,
+        driverLicenseNumber: '',
+        driverLicenseIssuedState: defaultPrincipalState // Required field - use same as principal state
+      }];
+    } else {
+      // Clean and ensure all principals have required fields with validated values
+      cleaned.principals = cleaned.principals.map((principal, index) => {
+        // Use business contact data if principal fields are empty
+        const firstName = principal.firstName || cleaned.business?.businessContact?.firstName || cleaned.business?.corporateName?.split(' ')[0] || `Principal ${index + 1}`;
+        const lastName = principal.lastName || cleaned.business?.businessContact?.lastName || cleaned.business?.corporateName?.split(' ').slice(1).join(' ') || 'Owner';
+        // Ensure state is valid - use CA as default if empty
+        const principalState = normalizeState(
+          principal.state || cleaned.business?.businessContact?.state || cleaned.business?.businessAddress?.dba?.state,
+          'CA'
+        );
+        // driverLicenseIssuedState is required - use principal state or CA
+        const driverLicenseState = normalizeState(
+          principal.driverLicenseIssuedState || principalState,
+          'CA'
+        );
+        
+        return {
+          firstName,
+          lastName,
+          socialSecurityNumber: normalizeSSN(principal.socialSecurityNumber || cleaned.business?.businessContact?.socialSecurityNumber),
+          dateOfBirth: principal.dateOfBirth || '',
+          phoneNumber: normalizePhone(principal.phoneNumber || cleaned.business?.phone),
+          email: principal.email || cleaned.business?.email || '',
+          street: principal.street || cleaned.business?.businessContact?.street || cleaned.business?.businessAddress?.dba?.street || '',
+          street2: principal.street2 || '',
+          city: principal.city || cleaned.business?.businessContact?.city || cleaned.business?.businessAddress?.dba?.city || '',
+          state: principalState, // Ensure valid state
+          zipCode: principal.zipCode || cleaned.business?.businessContact?.zipCode || cleaned.business?.businessAddress?.dba?.zipCode || '',
+          equityOwnershipPercentage: typeof principal.equityOwnershipPercentage === 'number' 
+            ? principal.equityOwnershipPercentage 
+            : (principal.equityOwnershipPercentage ? parseFloat(principal.equityOwnershipPercentage) || 0 : 0),
+          title: normalizeTitle(principal.title || 'owner'),
+          isPersonalGuarantor: principal.isPersonalGuarantor || false,
+          driverLicenseNumber: principal.driverLicenseNumber || '',
+          driverLicenseIssuedState: driverLicenseState // Required - ensure valid state
+        };
+      });
+    }
+    
+    return cleaned;
+  };
+
   const submitForm = async () => {
     setIsLoading(true);
     setLoadingMessage('Validating application...');
@@ -710,7 +977,90 @@ const MerchantForm = () => {
       const bankDocs = ['voided_check', 'bank_statement', 'processing_statement'];
       const hasBankDoc = documents.some(doc => bankDocs.includes(doc.type));
 
+      // Clean form data for PaymentsHub
+      const cleanedData = cleanFormDataForPaymentsHub(formData);
+      
+      // Log cleaned data for debugging
+      console.log('🧹 Cleaned form data for PaymentsHub:', {
+        business: {
+          corporateName: cleanedData.business?.corporateName,
+          dbaName: cleanedData.business?.dbaName,
+          federalTaxIdNumber: cleanedData.business?.federalTaxIdNumber,
+          mcc: cleanedData.business?.mcc,
+          phone: cleanedData.business?.phone,
+          email: cleanedData.business?.email,
+          averageTicketAmount: cleanedData.business?.averageTicketAmount,
+          averageMonthlyVolume: cleanedData.business?.averageMonthlyVolume,
+          highTicketAmount: cleanedData.business?.highTicketAmount,
+          merchandiseServicesSold: cleanedData.business?.merchandiseServicesSold,
+          hasBusinessContact: !!cleanedData.business?.businessContact,
+          hasBusinessAddress: !!cleanedData.business?.businessAddress
+        },
+        principalsCount: cleanedData.principals?.length || 0
+      });
+      
+      // Update application in PaymentsHub before validation
+      setLoadingMessage('Updating application in PaymentsHub...');
+      let updateSuccess = false;
+      try {
+        const updateResponse = await updateApplication(formData.externalKey, cleanedData);
+        console.log('✅ Successfully updated PaymentsHub:', updateResponse);
+        updateSuccess = true;
+        
+        // Small delay to ensure PaymentsHub has processed the update
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (updateError) {
+        console.error('❌ Failed to update PaymentsHub before validation:', updateError);
+        if (updateError.response?.data) {
+          console.error('Update error details:', updateError.response.data);
+        }
+        if (updateError.response?.status) {
+          console.error('Update HTTP status:', updateError.response.status);
+        }
+        
+        // Handle 422 validation errors - display them in the ErrorModal
+        if (updateError.response?.status === 422) {
+          const errorData = updateError.response.data;
+          // Check if errors are in the details.data.errors format
+          if (errorData.details?.data?.errors) {
+            setErrors(errorData.details.data.errors);
+          } else if (errorData.data?.errors) {
+            setErrors(errorData.data.errors);
+          } else if (errorData.errors) {
+            setErrors(errorData.errors);
+          } else {
+            // Fallback to general error
+            setErrors({
+              general: [
+                'Validation failed. Please check the form and try again. ' +
+                (errorData.message || updateError.message)
+              ]
+            });
+          }
+        } else {
+          // For other errors, show general error message
+          setErrors({
+            general: [
+              'Failed to update application data in PaymentsHub. ' +
+              'Please ensure all required fields are filled and try again. ' +
+              (updateError.response?.data?.message || updateError.message)
+            ]
+          });
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!updateSuccess) {
+        setErrors({
+          general: ['Failed to update application. Please check your data and try again.']
+        });
+        setIsLoading(false);
+        return;
+      }
+
       // Validate the application
+      setLoadingMessage('Validating application...');
       const validateData = await validateApplication(formData.externalKey);
       setValidationResponse(validateData);
       
